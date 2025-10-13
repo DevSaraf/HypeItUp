@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Meme Templates</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+  </head>
+  <body class="bg-gray-900 text-white font-[Inter]">
+    <div class="container mx-auto px-6 py-12">
+      <h1 class="text-4xl font-bold text-center mb-10 text-[#FEDA6A]">
+        Choose a Meme Template
+      </h1>
+
+      {% if memes %}
+  <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-8">
+    {% for meme in memes %}
+      <div class="bg-gray-800 rounded-xl shadow-lg overflow-hidden transition-transform transform hover:-translate-y-1 hover:shadow-2xl">
+        <img src="{{ meme.url }}" alt="{{ meme.name }}" class="w-full h-64 object-cover">
+        <div class="p-4 flex flex-col items-center">
+          <h2 class="text-lg font-semibold mb-3">{{ meme.name }}</h2>
+          <a href="{{ url_for('meme_editor', template_name=meme.id) }}"
+             class="bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-semibold py-2 px-5 rounded-lg transition-all duration-200">
+            Edit Template
+          </a>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+{% else %}
+  <p class="text-center text-gray-400">No memes could be loaded. Please check your internet connection.</p>
+{% endif %}
+
+
+      <div class="mt-12 text-center">
+        <a
+          href="{{ url_for('dashboard') }}"
+          class="text-yellow-400 hover:text-yellow-300 transition-colors duration-200"
+        >
+          ← Back to Dashboard
+        </a>
+      </div>
+    </div>
+  </body>
+</html>

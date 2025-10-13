@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HypeItUp Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    body {
+      font-family: "Inter", sans-serif;
+    }
+
+    .dashboard-card {
+      color: #2d3748;
+      border-radius: 1rem;
+      padding: 2.5rem 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+
+    .dashboard-card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 10px 15px rgba(0, 0, 0, 0.25);
+    }
+  </style>
+</head>
+
+<body class="bg-gray-900 text-white">
+  <div class="container mx-auto px-4 py-12 md:py-20 flex flex-col items-center min-h-screen">
+
+    <!-- Header -->
+    <header class="text-center mb-12 md:mb-16">
+      <h1 class="text-4xl md:text-5xl font-bold text-gray-200">
+        Welcome Back, Dev
+      </h1>
+      <p class="text-gray-400 mt-2 text-lg">Here’s your creative marketing toolkit 🔥</p>
+    </header>
+
+    <!-- Goals Section -->
+    <section class="w-full max-w-3xl mb-16">
+      <div class="bg-gray-800 rounded-2xl shadow-2xl p-8 border border-gray-700">
+        <div class="flex items-center mb-5">
+          <span class="text-2xl mr-3">🎯</span>
+          <h2 class="text-2xl font-semibold text-yellow-400">Your Current Goals</h2>
+        </div>
+
+        <ul class="space-y-4">
+          {% for reminder in reminders %}
+          <li class="flex items-center justify-between p-4 rounded-xl bg-gray-700 hover:bg-gray-600 transition">
+            <span class="text-gray-200 text-lg">{{ reminder.task }}</span>
+            <input type="checkbox"
+              class="h-5 w-5 rounded bg-gray-600 border-gray-500 text-yellow-500 focus:ring-yellow-500 cursor-pointer" />
+          </li>
+          {% else %}
+          <li class="text-gray-400 text-center text-lg italic">
+            No reminders yet. Add some goals!
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
+    </section>
+
+    <!-- Feature Grid -->
+    <main class="w-full max-w-4xl">
+      <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 md:gap-8 text-center">
+        <a href="{{ url_for('meme_templates') }}" class="dashboard-card" style="background-color: #feda6a">
+          <span class="font-semibold text-gray-800">Meme Template</span>
+        </a>
+
+        <a href="{{ url_for('trendy') }}" class="dashboard-card" style="background-color: #feda6a">
+          <span class="font-semibold text-gray-800">Trendy</span>
+        </a>
+
+        <a href="{{ url_for('recommendations') }}"
+          class="dashboard-card bg-[#FEDA6A] font-semibold text-gray-800">
+          Meme/Reel Recommendation
+        </a>
+
+        <a href="{{ url_for('video_editor') }}" class="dashboard-card bg-[#FEDA6A] font-semibold text-gray-800">
+          Editor
+        </a>
+
+        <a href="{{ url_for('goals') }}" class="dashboard-card bg-[#FEDA6A] font-semibold text-gray-800">
+          Set Goal
+        </a>
+
+        <a href="{{ url_for('create_post') }}" class="dashboard-card bg-[#FEDA6A] font-semibold text-gray-800">
+          Post on X/Reddit
+        </a>
+      </div>
+    </main>
+
+    <!-- Logout Button (below all 6 cards) -->
+    <div class="mt-12">
+      <form action="{{ url_for('logout') }}" method="get">
+        <button
+          class="bg-yellow-400 text-black font-bold px-6 py-2.5 rounded-full shadow-md hover:bg-yellow-300 transition flex items-center gap-2">
+          🚪 Logout
+        </button>
+      </form>
+    </div>
+
+  </div>
+</body>
+
+</html>

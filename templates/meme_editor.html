@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{{ meme_name }}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      body {
+        font-family: "Inter", sans-serif;
+      }
+
+      .draggable {
+        position: absolute;
+        cursor: move;
+        user-select: none;
+        color: black;
+        font-weight: bold;
+        text-align: center;
+        background: transparent;
+        border: none;
+        padding: 4px 8px;
+        transition: 0.1s ease;
+        outline: none;
+      }
+
+      .draggable:focus {
+        outline: 2px dashed #feda6a;
+        background: transparent;
+      }
+
+      #toolbar {
+        display: none;
+        position: fixed;
+        top: 50%;
+        right: 40px;
+        transform: translateY(-50%);
+        background: #1e293b; /* darker tone */
+        border-radius: 14px;
+        padding: 18px;
+        color: white;
+        box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+        width: 220px;
+        z-index: 999;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        transition: all 0.3s ease-in-out;
+      }
+
+      #toolbar label {
+        font-size: 14px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      #toolbar button {
+        width: 100%;
+        text-align: center;
+      }
+
+      input[type="range"] {
+        accent-color: #feda6a;
+      }
+    </style>
+  </head>
+
+  <body
+    class="bg-gray-900 text-white flex flex-col items-center min-h-screen py-10"
+  >
+    <h1 class="text-4xl font-bold text-[#FEDA6A] mb-8">{{ meme_name }}</h1>
+
+    <div
+      id="memeContainer"
+      class="relative bg-white p-2 rounded-xl shadow-lg inline-block"
+    >
+      {% if meme_url %}
+      <img
+        id="memeImage"
+        src="{{ meme_url }}"
+        alt="{{ meme_name }}"
+        crossorigin="anonymous"
+        class="rounded-xl shadow-lg max-w-md w-full block"
+      />
+      {% else %}
+      <p class="text-gray-400">Meme image not found.</p>
+      {% endif %}
+    </div>
+
+    <div class="flex flex-wrap justify-center gap-4 mt-10">
+      <button
+        id="addTextBtn"
+        class="bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-bold py-2 px-6 rounded-lg transition"
+      >
+        ➕ Add Text
+      </button>
+      <button
+        id="downloadBtn"
+        class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-6 rounded-lg transition"
+      >
+        ⬇️ Download Meme
+      </button>
+    </div>
+
+    <div class="mt-8">
+      <a
+        href="{{ url_for('meme_templates') }}"
+        class="text-yellow-400 hover:text-yellow-300 transition"
+      >
+        ← Back to Templates
+      </a>
+    </div>
+
+    <!-- Toolbar -->
+    <div id="toolbar" class="flex flex-col items-start">
+      <label class="text-sm flex items-center gap-1">
+        🎨 Color:
+        <input
+          type="color"
+          id="colorPicker"
+          value="#000000"
+          class="w-8 h-8 rounded-md cursor-pointer"
+        />
+      </label>
+
+      <label class="ml-4 text-sm flex items-center gap-1">
+        🔠 Size:
+        <input
+          type="range"
+          id="fontSize"
+          min="12"
+          max="72"
+          value="28"
+          class="cursor-pointer"
+        />
+      </label>
+
+      <label class="ml-4 text-sm flex items-center gap-1">
+        🌫️ Opacity:
+        <input
+          type="range"
+          id="opacitySlider"
+          min="0.3"
+          max="1"
+          step="0.1"
+          value="1"
+          class="cursor-pointer"
+        />
+      </label>
+
+      <button
+        id="toggleBg"
+        class="ml-4 bg-gray-700 hover:bg-gray-600 px-3 py-1 rounded text-sm"
+      >
+        🧾 Toggle BG
+      </button>
+
+      <button
+        id="deleteText"
+        class="ml-4 bg-red-600 hover:bg-red-500 px-3 py-1 rounded text-sm"
+      >
+        ❌ Delete Text
+      </button>
+    </div>
+
+    <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+    <script>
+      const memeContainer = document.getElementById("memeContainer");
+      const addTextBtn = document.getElementById("addTextBtn");
+      const downloadBtn = document.getElementById("downloadBtn");
+      const toolbar = document.getElementById("toolbar");
+      const colorPicker = document.getElementById("colorPicker");
+      const fontSize = document.getElementById("fontSize");
+      const opacitySlider = document.getElementById("opacitySlider");
+      const toggleBg = document.getElementById("toggleBg");
+      const deleteText = document.getElementById("deleteText");
+
+      let selectedText = null;
+
+      addTextBtn.addEventListener("click", () => {
+        const text = document.createElement("div");
+        text.className = "draggable";
+        text.contentEditable = true;
+        text.innerText = "Your text here";
+        text.style.top = "30px";
+        text.style.left = "30px";
+        memeContainer.appendChild(text);
+
+        let isDragging = false,
+          offsetX,
+          offsetY;
+
+        text.addEventListener("mousedown", (e) => {
+          selectedText = text;
+          toolbar.style.display = "flex";
+          isDragging = true;
+          offsetX = e.offsetX;
+          offsetY = e.offsetY;
+          text.style.zIndex = 10;
+        });
+
+        window.addEventListener("mousemove", (e) => {
+          if (isDragging) {
+            const rect = memeContainer.getBoundingClientRect();
+            text.style.left = e.clientX - rect.left - offsetX + "px";
+            text.style.top = e.clientY - rect.top - offsetY + "px";
+          }
+        });
+
+        window.addEventListener("mouseup", () => (isDragging = false));
+
+        text.addEventListener("click", () => {
+          selectedText = text;
+          toolbar.style.display = "flex";
+        });
+      });
+
+      colorPicker.addEventListener("input", () => {
+        if (selectedText) selectedText.style.color = colorPicker.value;
+      });
+
+      fontSize.addEventListener("input", () => {
+        if (selectedText) selectedText.style.fontSize = fontSize.value + "px";
+      });
+
+      opacitySlider.addEventListener("input", () => {
+        if (selectedText) selectedText.style.opacity = opacitySlider.value;
+      });
+
+      toggleBg.addEventListener("click", () => {
+        if (selectedText) {
+          selectedText.style.background =
+            selectedText.style.background === "transparent"
+              ? "rgba(255,255,255,0.6)"
+              : "transparent";
+        }
+      });
+
+      deleteText.addEventListener("click", () => {
+        if (selectedText) {
+          memeContainer.removeChild(selectedText);
+          selectedText = null;
+          toolbar.style.display = "none";
+        }
+      });
+
+      downloadBtn.addEventListener("click", () => {
+        html2canvas(memeContainer, {
+          useCORS: true,
+          allowTaint: false,
+          scale: 2,
+          backgroundColor: null,
+        }).then((canvas) => {
+          const link = document.createElement("a");
+          link.download = "{{ meme_name | replace(' ', '_') }}.png";
+          link.href = canvas.toDataURL("image/png");
+          link.click();
+        });
+      });
+    </script>
+  </body>
+</html>

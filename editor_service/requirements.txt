@@ -1,0 +1,4 @@
+Flask==2.3.3
+moviepy==2.2.1
+pillow
+Werkzeug

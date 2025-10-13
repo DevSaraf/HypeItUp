@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{% block title %}HypeUp{% endblock %}</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
+
+<body class="bg-[#0b1221] text-yellow-400 min-h-screen flex flex-col items-center justify-center">
+
+    <!-- Navbar (visible only when logged in) -->
+    {% if session.user %}
+    <nav class="fixed top-0 w-full bg-[#0f1629] py-3 px-8 flex justify-between items-center shadow-lg">
+        <h1 class="text-xl font-bold text-yellow-400">🔥 HypeUp</h1>
+        <div class="space-x-6">
+            <a href="{{ url_for('dashboard_page') }}" class="hover:text-yellow-300">Dashboard</a>
+            <a href="{{ url_for('trendy') }}" class="hover:text-yellow-300">Trendy</a>
+            <a href="{{ url_for('recommendations') }}" class="hover:text-yellow-300">Recommendations</a>
+            <a href="{{ url_for('logout') }}" class="hover:text-yellow-300">Logout</a>
+        </div>
+    </nav>
+    <div class="mt-20"></div>
+    {% endif %}
+
+    <!-- Flash messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="mb-4 bg-yellow-300 text-black px-6 py-2 rounded-lg shadow-lg">
+                {% for category, message in messages %}
+                    <p>{{ message }}</p>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+
+    <!-- Page content -->
+    <div class="w-full max-w-3xl text-center">
+        {% block content %}{% endblock %}
+    </div>
+
+</body>
+</html>

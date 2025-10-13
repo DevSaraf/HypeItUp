@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Meme & Reel Recommendation System</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      background-color: #0f1624;
+      color: #f1f1f1;
+      font-family: 'Inter', sans-serif;
+    }
+
+    ul {
+      list-style-type: "✨ ";
+      margin-left: 1.2rem;
+      padding-left: 0;
+    }
+
+    li {
+      margin-bottom: 0.4rem;
+      color: #eee;
+    }
+  </style>
+</head>
+
+<body class="flex flex-col items-center justify-center min-h-screen px-4 py-10">
+
+  <!-- Header -->
+  <h1 class="text-4xl md:text-5xl font-bold mb-10 text-yellow-400 text-center">
+    Meme & Reel Recommendation System
+  </h1>
+
+  <!-- Form Section -->
+  <form method="POST" class="bg-gray-800 rounded-2xl shadow-lg p-8 w-full max-w-lg flex flex-col items-center gap-6">
+    <label for="campaign" class="text-lg font-medium text-gray-300">
+      Describe your campaign or topic:
+    </label>
+    <textarea id="campaign" name="campaign" rows="3"
+      placeholder="Example: Launching a new tech gadget, fitness brand, or movie trailer..."
+      class="w-full p-4 rounded-xl bg-gray-900 text-white border border-gray-600 focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400"
+      required></textarea>
+
+    <button type="submit"
+      class="bg-yellow-400 hover:bg-yellow-500 text-gray-900 font-bold px-6 py-3 rounded-xl shadow-lg transition-all duration-200 transform hover:scale-105">
+      🎥 Generate Recommendations
+    </button>
+  </form>
+
+  {% if data %}
+<div class="ai-box">
+  <h3>✨ AI-Generated Suggestions</h3>
+
+  <h4>🎭 Meme Ideas</h4>
+  <ul>{% for m in data.memes %}<li>{{ m }}</li>{% endfor %}</ul>
+
+  <h4>🎬 Reel Ideas</h4>
+  <ul>{% for r in data.reels %}<li>{{ r }}</li>{% endfor %}</ul>
+
+  <h4>🏷️ Suggested Hashtags</h4>
+  <p>{{ data.hashtags | join(' ') }}</p>
+
+  <h4>⏰ Best Time to Post</h4>
+  <p>{{ data.best_time }}</p>
+
+  <h4>💡 Viral Tip</h4>
+  <p>{{ data.tip }}</p>
+</div>
+{% endif %}
+
+
+
+  <!-- Back to Dashboard -->
+  <div class="mt-10">
+    <a href="{{ url_for('dashboard') }}" class="text-yellow-400 hover:text-yellow-300 text-lg transition">
+      ← Back to Dashboard
+    </a>
+  </div>
+
+</body>
+
+</html>
