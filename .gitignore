@@ -1,0 +1,34 @@
+# --- Environment Variables ---
+.env
+
+# --- Virtual Environment ---
+venv/
+.venv/
+
+# --- Uploaded or Generated Media ---
+uploads/
+videos/
+*.mp4
+*.avi
+*.mov
+
+# --- Python Cache and Compiled Files ---
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# --- Databases ---
+*.db
+*.sqlite3
+
+# --- Logs ---
+*.log
+
+# --- IDE / Editor Files ---
+.vscode/
+.idea/
+
+# --- System Files ---
+.DS_Store
+Thumbs.db
