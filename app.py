@@ -1,112 +1,142 @@
-from flask import Flask, render_template, request, redirect, url_for, session, flash, send_file
-import sqlite3
-from functools import wraps
+
+# 1. IMPORTS
 import os
-import requests
-from dotenv import load_dotenv
-from openai import OpenAI
-import google.generativeai as genai
+import sqlite3
 import markdown
+import json
+import re
+from flask import Flask, render_template, request, redirect, url_for, session, flash, send_file
+from werkzeug.security import generate_password_hash, check_password_hash
+from functools import wraps
+from dotenv import load_dotenv
 from serpapi import GoogleSearch
-from utils.auth import create_user_table, register_user, validate_user
-from utils.ai_connectors import generate_text
-from moviepy.editor import VideoFileClip, concatenate_videoclips, AudioFileClip
-import tempfile
+import google.generativeai as genai
+from moviepy.editor import VideoFileClip, concatenate_videoclips, TextClip, CompositeVideoClip, AudioFileClip
+from utils.ai_connectors import fetch_youtube_trends
 
-# ------------------ BASIC SETUP ------------------
 
-load_dotenv()
+# 2. INITIALIZATION & CONFIGURATION
 
+
+# --- App & Environment Setup ---
 app = Flask(__name__)
-app.secret_key = "supersecretkey"
+load_dotenv()
+app.secret_key = os.getenv("SECRET_KEY", "a_super_secret_default_key") # Use a key from .env for security
 
-# Initialize database for goals and users
+# --- API Client Configuration ---
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+DEFAULT_GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-pro") # Defaulting to 2.5 Pro
+SERPAPI_KEY = os.getenv("SERPAPI_KEY")
+GENAI_AVAILABLE = False
+
+if GEMINI_API_KEY:
+    try:
+        genai.configure(api_key=GEMINI_API_KEY)
+        GENAI_AVAILABLE = True
+        print(f"✅ Gemini Client initialized successfully. Using model: {DEFAULT_GEMINI_MODEL}")
+    except Exception as e:
+        print(f"⚠️ ERROR: Failed to configure Gemini: {e}")
+else:
+    print("🔴 WARNING: GEMINI_API_KEY not found. AI features will be disabled.")
+
+# --- Database & File Uploads ---
 DATABASE_FILE = "hypeup.db"
 app.config["UPLOAD_FOLDER"] = "uploads"
 os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
 
+
+# 3. DATABASE & AUTH HELPERS
+
+
 def init_db():
+    """Initializes the goals table."""
     with sqlite3.connect(DATABASE_FILE) as conn:
         cursor = conn.cursor()
         cursor.execute('''CREATE TABLE IF NOT EXISTS goals (
                             id INTEGER PRIMARY KEY AUTOINCREMENT,
                             task TEXT NOT NULL,
-                            duration TEXT NOT NULL
+                            duration TEXT NOT NULL,
+                            completed BOOLEAN NOT NULL CHECK (completed IN (0, 1))
                         )''')
         conn.commit()
 
-create_user_table()
-init_db()
+def create_user_table():
+    """Initializes the users table."""
+    with sqlite3.connect(DATABASE_FILE) as conn:
+        cursor = conn.cursor()
+        cursor.execute('''CREATE TABLE IF NOT EXISTS users (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            username TEXT NOT NULL,
+                            email TEXT UNIQUE NOT NULL,
+                            password_hash TEXT NOT NULL
+                        )''')
+        conn.commit()
 
-# ------------------ OPENROUTER + GEMINI CONFIG ------------------
+def register_user(username, email, password):
+    """Registers a new user."""
+    password_hash = generate_password_hash(password)
+    try:
+        with sqlite3.connect(DATABASE_FILE) as conn:
+            cursor = conn.cursor()
+            cursor.execute("INSERT INTO users (username, email, password_hash) VALUES (?, ?, ?)",
+                           (username, email, password_hash))
+            conn.commit()
+        return True
+    except sqlite3.IntegrityError: # This happens if the email is already taken
+        return False
 
-client = OpenAI(
-    base_url="https://openrouter.ai/api/v1",
-    api_key=os.getenv("OPENROUTER_API_KEY")
-)
+def validate_user(email, password):
+    """Validates user credentials for login."""
+    with sqlite3.connect(DATABASE_FILE) as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT password_hash FROM users WHERE email = ?", (email,))
+        result = cursor.fetchone()
+        if result and check_password_hash(result[0], password):
+            return True
+    return False
 
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-
-print("🔑 OpenRouter key loaded:", bool(os.getenv("OPENROUTER_API_KEY")))
-
-# ------------------ LOGIN PROTECTION ------------------
-
+# --- Login Protection Decorator ---
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if "user" not in session:
+            flash("Please log in to access this page.", "warning")
             return redirect(url_for("login"))
         return f(*args, **kwargs)
     return decorated_function
 
 
-# ------------------ AUTH ROUTES ------------------
+# 4. AUTHENTICATION ROUTES
+
 
 @app.route("/")
 def home():
-    if "user" in session:
-        return redirect(url_for("dashboard"))
     return redirect(url_for("login"))
-
-
 
 @app.route("/signup", methods=["GET", "POST"])
 def signup():
     if "user" in session:
         return redirect(url_for("dashboard"))
-
     if request.method == "POST":
-        username = request.form["username"]
-        email = request.form["email"]
-        password = request.form["password"]
-
-        if register_user(username, email, password):
+        if register_user(request.form["username"], request.form["email"], request.form["password"]):
             flash("✅ Account created successfully! Please log in.", "success")
             return redirect(url_for("login"))
         else:
             flash("⚠️ Email already exists. Try another.", "error")
-
     return render_template("signup.html")
-
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if "user" in session:
         return redirect(url_for("dashboard"))
-
     if request.method == "POST":
-        email = request.form["email"]
-        password = request.form["password"]
-
-        if validate_user(email, password):
-            session["user"] = email
+        if validate_user(request.form["email"], request.form["password"]):
+            session["user"] = request.form["email"]
             flash("✅ Logged in successfully!", "success")
             return redirect(url_for("dashboard"))
         else:
             flash("❌ Invalid credentials. Try again.", "error")
-
     return render_template("login.html")
-
 
 @app.route("/logout")
 def logout():
@@ -115,7 +145,8 @@ def logout():
     return redirect(url_for("login"))
 
 
-# ------------------ DASHBOARD ------------------
+# 5. CORE FEATURE ROUTES
+
 
 @app.route("/dashboard")
 @login_required
@@ -127,33 +158,24 @@ def dashboard():
         reminders = cursor.fetchall()
     return render_template("index.html", reminders=reminders)
 
-
-
-
-
-# ------------------ GOALS ------------------
 @app.route("/goals", methods=["GET", "POST"])
+@login_required
 def goals():
-    if request.method == "POST":
-        task = request.form["task"]
-        duration = request.form["duration"]
-
-        if task and duration:
-            with sqlite3.connect(DATABASE_FILE) as conn:
-                cursor = conn.cursor()
-                cursor.execute("INSERT INTO goals (task, duration) VALUES (?, ?)", (task, duration))
-                conn.commit()
-        return redirect(url_for("goals"))
-
     with sqlite3.connect(DATABASE_FILE) as conn:
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
+        if request.method == 'POST':
+            task, duration = request.form.get('task'), request.form.get('duration')
+            if task and duration:
+                cursor.execute("INSERT INTO goals (task, duration, completed) VALUES (?, ?, ?)", (task, duration, False))
+                conn.commit()
+            return redirect(url_for('goals'))
         cursor.execute("SELECT * FROM goals ORDER BY id DESC")
-        goals = cursor.fetchall()
-    return render_template("goal.html", goals=goals)
-
+        all_goals = cursor.fetchall()
+    return render_template("goal.html", goals=all_goals)
 
 @app.route("/delete_goal/<int:goal_id>", methods=["POST"])
+@login_required
 def delete_goal(goal_id):
     with sqlite3.connect(DATABASE_FILE) as conn:
         cursor = conn.cursor()
@@ -161,102 +183,27 @@ def delete_goal(goal_id):
         conn.commit()
     return redirect(url_for("goals"))
 
-
-# ------------------ CREATE POST ------------------
-# import markdown  
-
-# @app.route("/create_post", methods=["GET", "POST"])
-# def create_post():
-#     ai_generated = None
-
-#     if request.method == "POST":
-#         content = request.form.get("content", "")
-#         platform = request.form.get("platform", "")
-
-#         try:
-#             prompt = f"""
-#             Create a viral, catchy, and engaging post for {platform}.
-#             Campaign details: {content}.
-#             Keep it under 100 words and include relevant hashtags.
-#             """
-
-#             completion = client.chat.completions.create(
-#                 model="deepseek/deepseek-r1:free",
-#                 messages=[
-#                     {"role": "system", "content": "You are a professional digital marketing assistant."},
-#                     {"role": "user", "content": prompt}
-#                 ]
-#             )
-
-#             raw_text = completion.choices[0].message.content.strip()
-
-#             # ✅ Convert Markdown to clean HTML
-#             ai_generated = markdown.markdown(raw_text)
-
-#         except Exception as e:
-#             ai_generated = f"⚠️ Error generating content: {str(e)}"
-
-#     return render_template("create_post.html", ai_generated=ai_generated)
-
-from utils.ai_connectors import generate_text
-import markdown
-
 @app.route("/create_post", methods=["GET", "POST"])
+@login_required
 def create_post():
     ai_generated = None
-
     if request.method == "POST":
+        platform = request.form.get("platform", "social media")
         content = request.form.get("content", "")
-        platform = request.form.get("platform", "")
-
-        try:
-            prompt = f"""
-            Create a viral, catchy, and engaging post for {platform}.
-            Campaign details: {content}.
-            Keep it under 100 words and include relevant hashtags and emojis.
-            """
-
-            # ✅ Use the universal helper (DeepSeek via OpenRouter)
-            raw_text = generate_text(prompt)
-
-            # ✅ Convert Markdown to clean HTML
-            ai_generated = markdown.markdown(raw_text)
-
-        except Exception as e:
-            ai_generated = f"⚠️ Error generating content: {str(e)}"
-
+        if not GENAI_AVAILABLE:
+            ai_generated = "⚠️ AI service unavailable. Check GEMINI_API_KEY."
+        else:
+            try:
+                model = genai.GenerativeModel(DEFAULT_GEMINI_MODEL)
+                prompt = f"Create a viral, catchy post for {platform} about '{content}'. Include relevant hashtags and emojis. Format with Markdown."
+                response = model.generate_content(prompt)
+                ai_generated = markdown.markdown(response.text)
+            except Exception as e:
+                ai_generated = f"⚠️ Error generating content: {e}"
     return render_template("create_post.html", ai_generated=ai_generated)
 
-
-# @app.route("/create_post", methods=["GET", "POST"])
-# def create_post():
-#     ai_generated = None
-
-#     if request.method == "POST":
-#         content = request.form.get("content", "")
-#         platform = request.form.get("platform", "")
-
-#         try:
-            # Create a prompt for the local Gemma 2 model
-            # prompt = f"""
-            # You are a creative social media strategist.
-            # Write a short, viral, and engaging post for {platform}.
-            # Campaign details: {content}.
-            # Keep it within 100 words, add emojis, and include 3–5 relevant hashtags.
-            # """
-
-            # 🔹 Generate using your local Ollama model (Gemma 2)
-    #         ai_generated = generate_text(prompt)
-
-    #     except Exception as e:
-    #         ai_generated = f"⚠️ Error generating content: {str(e)}"
-
-    # return render_template("create_post.html", ai_generated=ai_generated)
-
-
-
-
 @app.route("/meme_templates")
+@login_required
 def meme_templates():
     memes = []
 
@@ -284,7 +231,9 @@ def meme_templates():
 
 
 
+import requests
 @app.route("/meme_editor/<template_name>")
+@login_required
 def meme_editor(template_name):
     # Try to find the meme by ID from Imgflip API first
     meme_url = None
@@ -320,630 +269,178 @@ def meme_editor(template_name):
     return render_template("meme_editor.html", meme_name=meme_name, meme_url=meme_url)
 
 
-
-# ------------------ TRENDY (NEW FEATURE) ------------------
-# import re, json, html
-
-# def clean_ai_text(s: str) -> str:
-#     """
-#     Remove Markdown/asterisks/extra whitespace/HTML entities/emojis and return plain text.
-#     """
-#     if not s:
-#         return ""
-#     # Decode HTML entities
-#     s = html.unescape(s)
-#     # Remove code fences and inline code ticks
-#     s = re.sub(r"```.*?```", " ", s, flags=re.DOTALL)
-#     s = s.replace("`", " ")
-#     # Remove Markdown emphasis/strong markers and leftover asterisks / underscores
-#     s = re.sub(r"(\*|_){1,}", " ", s)
-#     # Remove common emoji characters (basic range), keep simple characters
-#     s = re.sub(r"[\U0001F300-\U0001F6FF\U0001F900-\U0001F9FF\U00002600-\U000027BF]+", " ", s)
-#     # Remove repeated punctuation
-#     s = re.sub(r"[^\w#\s,-]{2,}", " ", s)
-#     # Collapse whitespace
-#     s = re.sub(r"\s+", " ", s).strip()
-#     return s
-
-# def extract_hashtags_and_tip(raw_output: str):
-    # """
-    # Given raw AI output, try:
-    #   1) JSON extraction (preferred),
-    #   2) Regex hashtag extraction + sentence heuristics for tip,
-    #   3) fallback defaults.
-    # Returns: (list_of_hashtags, tip_string)
-    # """
-    # hashtags = []
-    # tip = ""
-
-    # # 1) Try to locate JSON-like substring and parse
-    # try:
-    #     json_match = re.search(r"\{.*\}", raw_output, re.DOTALL)
-    #     if json_match:
-    #         # attempt to clean common separators before json parse
-    #         possible_json = json_match.group(0)
-    #         possible_json = possible_json.replace("\n", " ")
-    #         data = json.loads(possible_json)
-    #         # normalize values
-    #         raw_hashtags = data.get("hashtags") or data.get("tags") or data.get("tags_list") or []
-    #         if isinstance(raw_hashtags, str):
-    #             # sometimes single string of comma separated tags
-    #             raw_hashtags = re.findall(r"#\w+", raw_hashtags) or [t.strip() for t in raw_hashtags.split(",") if t.strip()]
-    #         hashtags = [clean_ai_text(h) for h in raw_hashtags if h]
-    #         tip = clean_ai_text(data.get("tip") or data.get("advice") or data.get("strategy") or "")
-    # except Exception:
-    #     # ignore parse errors and fall back
-    #     pass
-
-    # # 2) If JSON failed or produced few results, fallback to regex
-    # if len(hashtags) < 3:
-    #     # Extract hashtags (#word) first
-    #     found = re.findall(r"(?:#\w[\w-]*)", raw_output)
-    #     if found:
-    #         hashtags = [clean_ai_text(h) for h in found]
-    #         # remove duplicates while preserving order
-    #         seen = set(); uniq = []
-    #         for h in hashtags:
-    #             if h.lower() not in seen:
-    #                 seen.add(h.lower()); uniq.append(h)
-    #         hashtags = uniq
-
-    # # 3) If still not enough, look for comma-separated keywords and pick top candidates
-    # if len(hashtags) < 3:
-    #     # attempt to look for "Hashtags:" lines or "1." lists
-    #     lines = raw_output.splitlines()
-    #     candidates = []
-    #     for line in lines:
-    #         line_clean = clean_ai_text(line)
-    #         # comma separated tokens that look like tag words
-    #         parts = re.split(r"[,\-—\|;:]", line_clean)
-    #         for p in parts:
-    #             p = p.strip()
-    #             # skip sentences
-    #             if len(p) <= 0 or len(p.split()) > 4:
-    #                 continue
-    #             # convert phrase -> hashtag
-    #             h = "#" + re.sub(r"[^\w]", "", p)
-    #             if len(h) > 1:
-    #                 candidates.append(h)
-    #     # append candidates
-    #     for c in candidates:
-    #         if c.lower() not in {h.lower() for h in hashtags}:
-    #             hashtags.append(c)
-    #             if len(hashtags) >= 5:
-    #                 break
-
-    # # ensure lowercase and remove duplicates, keep up to 5
-    # normalized = []
-    # seen = set()
-    # for h in hashtags:
-    #     h_clean = h.strip()
-    #     if not h_clean:
-    #         continue
-    #     # ensure leading #
-    #     if not h_clean.startswith("#"):
-    #         h_clean = "#" + re.sub(r"[^\w-]", "", h_clean)
-    #     if h_clean.lower() not in seen:
-    #         seen.add(h_clean.lower())
-    #         normalized.append(h_clean)
-    #     if len(normalized) >= 5:
-    #         break
-    # hashtags = normalized
-
-    # # 4) Tip extraction heuristics: look for short sentences beginning with verbs or explicit "Tip:"
-    # if not tip:
-    #     # try "Tip: ..." or "Advice: ..."
-    #     m = re.search(r"(?:Tip|Advice|Strategy|Suggestion|Post)\s*[:\-]\s*(.+?)(?:\.|$)", raw_output, re.IGNORECASE)
-    #     if m:
-    #         tip = clean_ai_text(m.group(1))
-    #     else:
-    #         # fallback: find a short sentence with imperative verbs
-    #         sentences = re.split(r"[.\n]", raw_output)
-    #         for s in sentences:
-    #             s_clean = clean_ai_text(s)
-    #             if not s_clean:
-    #                 continue
-    #             # pick short sentence (<= 18 words) that starts with a verb-ish or strong phrase
-    #             if len(s_clean.split()) <= 18 and re.match(r"^(Post|Use|Try|Share|Focus|Target|Emphas|Include|Upload|Use|Add|Post|Engage)\b", s_clean, re.IGNORECASE):
-    #                 tip = s_clean
-    #                 break
-
-    # # 5) final fallbacks if nothing found
-    # if not hashtags:
-    #     hashtags = ["#Viral", "#TrendingNow", "#SocialMedia", "#Meme", "#Marketing"]
-    # if not tip:
-    #     tip = "Post between 6–9 PM local time and use 3–5 relevant hashtags."
-
-    # return hashtags[:5], tip.strip()
-# @app.route("/trendy", methods=["GET", "POST"])
-# def trendy():
-#     """
-#     Improved trendy endpoint: deterministic, structured prompt and robust extraction.
-#     """
-#     country = request.args.get("country", "India")
-#     state = request.args.get("state", "")
-#     region = state or country
-
-#     # Strict prompt: ask for JSON and short answers, insist on 5 hashtags + short tip
-#     prompt = f"""
-# You are a precise social media growth assistant. For the region: {region}, produce exactly FIVE trending hashtags
-# and one extremely short viral tip (no more than 14 words). Output MUST be valid JSON only, like:
-
-# {{ "hashtags": ["#tag1","#tag2","#tag3","#tag4","#tag5"], "tip": "one short tip here" }}
-
-# Do not add any commentary, markdown, bullets or explanation — ONLY the JSON object.
-# If you do not know exact trending tags, produce plausible popular hashtags for that region.
-# """
-
-
-
-    # raw_output = ""
-    # try:
-    #     # Use deterministic generation
-    #     completion = client.chat.completions.create(
-    #         model="deepseek/deepseek-r1:free",
-    #         messages=[
-    #             {"role": "system", "content": "You are a concise, structured marketing assistant."},
-    #             {"role": "user", "content": prompt}
-    #         ],
-    #         max_tokens=200,
-    #         temperature=0.0  # low randomness
-    #     )
-
-    #     raw_output = completion.choices[0].message.content.strip()
-
-
-    # try:
-    #     raw_output = generate_text(prompt)
-    #     print("🧠 raw_output from model:", raw_output)
-    # except Exception as e:
-    #     print("⚠️ Error calling model:", e)
-        # Fallback response if local model fails
-    #     raw_output = '{"hashtags": ["#Viral", "#TrendingNow", "#SocialMedia", "#Marketing", "#Buzz"], "tip": "Post during evening peak hours."}'
-    # # Extract hashtags + tip robustly
-    # hashtags, ai_tip = extract_hashtags_and_tip(raw_output)
-
-    # Render the template
-    # return render_template("trendy.html", country=country, state=state, trends=hashtags, ai_tip=ai_tip)
-
-
-# ------------------ TRENDY (FINAL RESTORED VERSION) ------------------
-import re, json, html, os, requests
-from flask import render_template, request
-from dotenv import load_dotenv
-
-load_dotenv()
-
-# --- Text cleaner utility ---
-def clean_ai_text(s: str) -> str:
-    """Clean text from markdown, emojis, and junk."""
-    if not s:
-        return ""
-    s = html.unescape(s)
-    s = re.sub(r"```.*?```", " ", s, flags=re.DOTALL)
-    s = s.replace("`", " ")
-    s = re.sub(r"(\*|_){1,}", " ", s)
-    s = re.sub(r"[\U0001F300-\U0001F6FF\U0001F900-\U0001F9FF\U00002600-\U000027BF]+", " ", s)
-    s = re.sub(r"[^\w#\s,-]{2,}", " ", s)
-    s = re.sub(r"\s+", " ", s).strip()
-    return s
-
-
-# --- Hashtag & Tip extractor ---
-def extract_hashtags_and_tip(raw_output: str):
-    """Extract hashtags and viral tip safely from AI output."""
-    hashtags, tip = [], ""
-
-    try:
-        # Try to find JSON content and parse it
-        match = re.search(r"\{.*\}", raw_output, re.DOTALL)
-        if match:
-            data = json.loads(match.group(0))
-            hashtags = data.get("hashtags", [])
-            tip = data.get("tip", "")
-    except Exception:
-        pass
-
-    # Fallback to regex hashtag extraction
-    if not hashtags:
-        hashtags = re.findall(r"#\w[\w-]*", raw_output)
-        hashtags = list(dict.fromkeys(hashtags))[:5]  # remove duplicates, limit 5
-
-    # Tip extraction heuristic
-    if not tip:
-        m = re.search(r"(?:Tip|Advice|Strategy|Suggestion)\s*[:\-]\s*(.+?)(?:\.|$)", raw_output, re.IGNORECASE)
-        if m:
-            tip = clean_ai_text(m.group(1))
-        else:
-            tip = "Post between 6–9 PM local time using 3–5 relevant hashtags."
-
-    if not hashtags:
-        hashtags = ["#Viral", "#TrendingNow", "#SocialBuzz", "#MarketingTips", "#HypeUp"]
-
-    return hashtags, tip
-
-
-# --- Trendy route ---
-@app.route("/trendy", methods=["GET", "POST"])
+@app.route("/trendy", methods=["GET"])
+@login_required
 def trendy():
-    """
-    Restored and fixed 'Trendy' feature using dedicated OPENROUTER_TRENDY_API_KEY.
-    Deterministic output with strong fallback handling.
-    """
     country = request.args.get("country", "India")
     state = request.args.get("state", "")
     region = state or country
-
-    # Strict, structured prompt
-    prompt = f"""
-    You are a precise social media growth assistant. For the region: {region},
-    produce exactly FIVE trending hashtags and one extremely short viral tip (no more than 14 words).
-    Output MUST be valid JSON only, like:
-    {{
-        "hashtags": ["#tag1","#tag2","#tag3","#tag4","#tag5"],
-        "tip": "one short tip here"
-    }}
-    Do not add commentary or markdown — ONLY return the JSON object.
-    """
-
-    raw_output = ""
-    try:
-        # 🔑 Use the dedicated Trendy API key
-        headers = {
-            "Authorization": f"Bearer {os.getenv('OPENROUTER_TRENDY_API_KEY')}",
-            "Content-Type": "application/json",
-        }
-
-        data = {
-            "model": "deepseek/deepseek-r1:free",
-            "messages": [
-                {"role": "system", "content": "You are a concise, structured marketing assistant."},
-                {"role": "user", "content": prompt},
-            ],
-            "temperature": 0.0,
-            "max_tokens": 200,
-        }
-
-        response = requests.post("https://openrouter.ai/api/v1/chat/completions",
-                                 headers=headers, json=data, timeout=60)
-        response.raise_for_status()
-
-        raw_output = response.json()["choices"][0]["message"]["content"].strip()
-        print("🧠 Raw AI output:", raw_output)
-
-    except Exception as e:
-        print("⚠️ Error calling model:", e)
-        raw_output = '{"hashtags": ["#Viral", "#TrendingNow", "#SocialMedia", "#Marketing", "#Buzz"], "tip": "Post during evening peak hours."}'
-
-    # ✅ Extract hashtags and viral tip
-    hashtags, ai_tip = extract_hashtags_and_tip(raw_output)
-
-    return render_template("trendy.html", country=country, state=state, trends=hashtags, ai_tip=ai_tip)
-
-
-# ------------------ MEME/REEL RECOMMENDATION ------------------
-# @app.route("/recommendations", methods=["GET", "POST"])
-# def recommendations():
-#     """
-#     AI-powered Meme & Reel Recommendation System using DeepSeek
-#     """
-#     campaign_topic = request.form.get("campaign", "").strip()
-#     ai_data = None
-
-#     if not campaign_topic:
-#         return render_template("recommendations.html", data=None, campaign=None)
-
-#     try:
-#         # 🔹 AI Prompt
-#         prompt = f"""
-#         You are a professional social media strategist.
-#         Suggest viral ideas for memes, reels, and hashtags for a campaign about "{campaign_topic}".
-#         Provide JSON output in this exact structure only:
-#         {{
-#           "memes": ["Meme idea 1", "Meme idea 2", "Meme idea 3"],
-#           "reels": ["Reel idea 1", "Reel idea 2", "Reel idea 3"],
-#           "hashtags": ["#tag1", "#tag2", "#tag3", "#tag4", "#tag5"],
-#           "best_time": "Best posting time for viral reach",
-#           "tip": "One short expert viral strategy tip"
-#         }}
-#         Keep your ideas creative, short, and relevant.
-#         """
-
-
-
-        # completion = client.chat.completions.create(
-        #     model="deepseek/deepseek-r1:free",
-        #     messages=[
-        #         {"role": "system", "content": "You are a marketing AI that gives viral social media strategies."},
-        #         {"role": "user", "content": prompt}
-        #     ],
-        #     temperature=0.7,
-        #     max_tokens=500
-        # )
-
-        # raw_output = completion.choices[0].message.content.strip()
-        # raw_output = generate_text(prompt)
-
-
-    #     import json, re
-    #     match = re.search(r"\{.*\}", raw_output, re.DOTALL)
-    #     if match:
-    #         ai_data = json.loads(match.group())
-    #     else:
-    #         raise ValueError("Invalid AI output format")
-
-    # except Exception as e:
-    #     print("⚠️ AI Recommendation Error:", e)
-    #     ai_data = {
-    #         "memes": [
-    #             "Relatable before/after meme",
-    #             "Screenshot of customer reaction meme",
-    #             "Funny reaction mashup"
-    #         ],
-    #         "reels": [
-    #             "Behind-the-scenes video",
-    #             "Trend remix with voiceover",
-    #             "Fast tutorial with trending audio"
-    #         ],
-    #         "hashtags": ["#Viral", "#TrendingNow", "#SocialMediaBuzz", "#MarketingTrend"],
-    #         "best_time": "6–9 PM local time",
-    #         "tip": "Keep the first 2 seconds engaging — start with emotion or humor."
-    #     }
-
-    # return render_template("recommendations.html", campaign=campaign_topic, data=ai_data)
-
-
-from utils.ai_connectors import generate_text, fetch_youtube_trends
-import re, json
+    trends, ai_tip = [], "Submit a location to get trends."
+    if 'country' in request.args:
+        if not GENAI_AVAILABLE:
+            ai_tip = "⚠️ AI service is unavailable."
+            trends = ["AI Offline"]
+        else:
+            try:
+                params = {"engine": "google_trends", "q": f"Top searches in {region}", "api_key": SERPAPI_KEY}
+                results = GoogleSearch(params).get_dict()
+                trends = [item['query'] for item in results.get("related_queries", {}).get('rising', [])[:5]]
+                if trends:
+                    model = genai.GenerativeModel('gemini-1.5-flash')
+                    prompt = f"Given these trending topics in {region}: {', '.join(trends)}. Provide one short, actionable marketing tip (max 15 words)."
+                    response = model.generate_content(prompt)
+                    ai_tip = response.text
+                else:
+                    ai_tip = "No specific rising trends found for this region."
+            except Exception as e:
+                ai_tip, trends = f"⚠️ Error: {e}", ["Error"]
+    return render_template("trendy.html", country=country, state=state, trends=trends, ai_tip=ai_tip)
 
 @app.route("/recommendations", methods=["GET", "POST"])
+@login_required
 def recommendations():
     campaign_topic = request.form.get("campaign", "").strip()
     ai_data = None
-
-    if not campaign_topic:
-        return render_template("recommendations.html", data=None, campaign=None)
-
-    # Step 1️⃣: Fetch YouTube trends via SerpAPI
-    video_titles = fetch_youtube_trends(campaign_topic)
-    print("🎥 YouTube results:", video_titles)
-
-    # Step 2️⃣: Create prompt for DeepSeek/OpenRouter
-    prompt = f"""
-    You are a social media expert specializing in digital marketing.
-    Based on these trending YouTube topics:
-    {', '.join(video_titles) or campaign_topic}
-
-    Suggest creative ideas in the following exact JSON format only:
-    {{
-      "memes": ["idea1", "idea2", "idea3"],
-      "reels": ["idea1", "idea2", "idea3"],
-      "hashtags": ["#tag1", "#tag2", "#tag3"],
-      "best_time": "time to post",
-      "tip": "short viral posting tip"
-    }}
-    """
-
-    # Step 3️⃣: Call AI via OpenRouter (with “recommendation” context)
-    raw_output = generate_text(prompt, context="recommendation")
-    print("🧠 Raw AI output:", raw_output)
-
-    # Step 4️⃣: Try to extract JSON safely
-    try:
-        match = re.search(r"\{.*\}", raw_output, re.DOTALL)
-        if match:
-            ai_data = json.loads(match.group())
+    if campaign_topic:
+        if not GENAI_AVAILABLE:
+            ai_data = {"error": "AI service unavailable."}
         else:
-            raise ValueError("No JSON object found in AI response")
-
-    except Exception as e:
-        print("⚠️ JSON parse error:", e)
-        # Safe fallback data
-        ai_data = {
-            "memes": [
-                "When analytics show 0 views but your mom liked it ❤️",
-                "POV: Your campaign finally goes viral 🎯",
-                "Me waiting for engagement after posting at 3 AM ⏰"
-            ],
-            "reels": [
-                "Mini tutorial using trending audio",
-                "BTS reel showing your creative process",
-                "Before/After reel of campaign success"
-            ],
-            "hashtags": ["#MarketingHumor", "#RelatableReels", "#Viral2025", "#ContentKing", "#DigitalHype"],
-            "best_time": "6–9 PM local time",
-            "tip": "Mix humor and relatability with trending sounds to maximize reach."
-        }
-
+            try:
+                # This function needs to be in your utils/ai_connectors.py
+                video_titles = fetch_youtube_trends(campaign_topic)
+                prompt = f"""
+                You are a social media expert. Based on the campaign "{campaign_topic}" and these trending YouTube titles: {', '.join(video_titles)}.
+                Suggest ideas in the following exact JSON format only:
+                {{
+                    "memes": ["idea1", "idea2", "idea3"],
+                    "reels": ["idea1", "idea2", "idea3"],
+                    "hashtags": ["#tag1", "#tag2", "#tag3"],
+                    "best_time": "time to post",
+                    "tip": "short viral tip"
+                }}
+                """
+                model = genai.GenerativeModel(DEFAULT_GEMINI_MODEL)
+                response = model.generate_content(prompt)
+                match = re.search(r"\{.*\}", response.text, re.DOTALL)
+                ai_data = json.loads(match.group()) if match else {"error": "Invalid AI response format"}
+            except Exception as e:
+                ai_data = {"error": f"An error occurred: {e}"}
     return render_template("recommendations.html", campaign=campaign_topic, data=ai_data)
 
 
-# ------------------ VIDEO EDITOR ------------------
-# @app.route("/video_editor", methods=["GET", "POST"])
-# def video_editor():
-#     if request.method == "POST":
-#         action = request.form.get("action")
-
-#         uploaded_files = request.files.getlist("videos")
-#         if not uploaded_files:
-#             return render_template("video_editor.html", message="⚠️ No video uploaded!")
-
-#         clips = []
-#         temp_dir = tempfile.mkdtemp()
-
-#         for file in uploaded_files:
-#             file_path = os.path.join(temp_dir, file.filename)
-#             file.save(file_path)
-#             clips.append(VideoFileClip(file_path))
-
-#         try:
-#             start_time = float(request.form.get("start_time") or 0)
-#             end_time = float(request.form.get("end_time") or 0)
-#         except ValueError:
-#             start_time, end_time = 0, 0
-
-#         result = None
-
-#         if action == "trim":
-#             trimmed_clips = [
-#                 clip.subclip(start_time, end_time if end_time > start_time else clip.duration)
-#                 for clip in clips
-#             ]
-#             result = trimmed_clips[0] if len(trimmed_clips) == 1 else concatenate_videoclips(trimmed_clips)
-
-#         elif action == "merge":
-#             result = concatenate_videoclips(clips)
-
-#         if result:
-#             output_path = os.path.join(temp_dir, "output.mp4")
-#             result.write_videofile(output_path, codec="libx264", audio_codec="aac")
-#             return send_file(output_path, as_attachment=True, download_name="edited_video.mp4")
-
-#     return render_template("video_editor.html")
+# 6. VIDEO EDITOR ROUTES
 
 
-# @app.route("/download_video")
-# def download_video():
-#     temp_path = os.path.join(tempfile.gettempdir(), "merged_video.mp4")
-#     if os.path.exists(temp_path):
-#         return send_file(temp_path, as_attachment=False)
-#     return "No video found.", 404
-
-# ------------------ VIDEO EDITOR (Frontend) ------------------
-import os
-from flask import Flask, render_template, request, send_file, redirect, url_for, flash
-from moviepy.editor import VideoFileClip, concatenate_videoclips, AudioFileClip, TextClip, CompositeVideoClip
-import tempfile
-
-# Ensure uploads folder exists
-UPLOAD_FOLDER = "uploads"
-if not os.path.exists(UPLOAD_FOLDER):
-    os.makedirs(UPLOAD_FOLDER)
-
-app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
-
-
-@app.route("/video_editor", methods=["GET", "POST"])
+@app.route("/video_editor")
+@login_required
 def video_editor():
-    # List available uploaded videos
-    video_files = [f for f in os.listdir(app.config["UPLOAD_FOLDER"]) if f.endswith(".mp4")]
-    audio_files = [f for f in os.listdir(app.config["UPLOAD_FOLDER"]) if f.endswith(".mp3")]
+    video_files = [f for f in os.listdir(app.config["UPLOAD_FOLDER"]) if f.endswith((".mp4", ".mov", ".avi"))]
+    audio_files = [f for f in os.listdir(app.config["UPLOAD_FOLDER"]) if f.endswith((".mp3", ".wav"))]
     return render_template("video_editor.html", videos=video_files, audios=audio_files)
 
+@app.route("/upload_file", methods=["POST"])
+@login_required
+def upload_file():
+    file = request.files.get("file")
+    if file and file.filename:
+        file.save(os.path.join(app.config["UPLOAD_FOLDER"], file.filename))
+        flash(f"✅ Uploaded successfully: {file.filename}", "success")
+    else:
+        flash("⚠️ No file selected.", "error")
+    return redirect(url_for("video_editor"))
 
-# ------------------ UPLOAD ------------------
-@app.route("/upload_video", methods=["POST"])
-def upload_video():
-    file = request.files.get("video")
-    if not file:
-        flash("⚠️ No video file selected.", "error")
+@app.route("/process_video", methods=["POST"])
+@login_required
+def process_video():
+    action = request.form.get("action")
+    video_name = request.form.get("video")
+    
+    # The 'merge' action is special because it doesn't use a single 'video_name'
+    if action == "merge":
+        video_names = request.form.getlist("videos") # Use getlist for multiple selections
+        if not video_names or len(video_names) < 2:
+            flash("⚠️ Please select at least two videos to merge.", "error")
+            return redirect(url_for("video_editor"))
+        
+        try:
+            clips = []
+            for name in video_names:
+                path = os.path.join(app.config["UPLOAD_FOLDER"], name)
+                if os.path.exists(path):
+                    clips.append(VideoFileClip(path))
+            
+            if not clips:
+                flash("⚠️ Could not find the selected video files.", "error")
+                return redirect(url_for("video_editor"))
+
+            final_clip = concatenate_videoclips(clips, method="compose")
+            output_path = os.path.join(app.config["UPLOAD_FOLDER"], "merged_output.mp4")
+            final_clip.write_videofile(output_path, codec="libx264", audio_codec="aac")
+            
+            # Close all the clip objects to free up resources
+            for clip in clips:
+                clip.close()
+
+            return send_file(output_path, as_attachment=True)
+
+        except Exception as e:
+            flash(f"⚠️ An error occurred during merge: {e}", "error")
+            return redirect(url_for("video_editor"))
+
+    # --- This part handles trim, add_text, and add_audio ---
+    if not video_name:
+        flash("⚠️ Please select a video for this action.", "error")
+        return redirect(url_for("video_editor"))
+        
+    video_path = os.path.join(app.config["UPLOAD_FOLDER"], video_name)
+    if not os.path.exists(video_path):
+        flash("⚠️ Video file not found!", "error")
         return redirect(url_for("video_editor"))
 
-    file_path = os.path.join(app.config["UPLOAD_FOLDER"], file.filename)
-    file.save(file_path)
-    flash(f"✅ Uploaded successfully: {file.filename}", "success")
+    try:
+        with VideoFileClip(video_path) as clip:
+            if action == "trim":
+                start, end = float(request.form.get("start")), float(request.form.get("end"))
+                result = clip.subclip(start, end)
+                output_filename = f"trimmed_{video_name}"
+            elif action == "add_text":
+                text = request.form.get("text")
+                txt_clip = TextClip(text, fontsize=70, color='white', font='Arial-Bold').set_position('center').set_duration(clip.duration)
+                result = CompositeVideoClip([clip, txt_clip])
+                output_filename = f"text_{video_name}"
+            elif action == "add_audio":
+                audio_name = request.form.get("audio")
+                audio_path = os.path.join(app.config["UPLOAD_FOLDER"], audio_name)
+                if not os.path.exists(audio_path):
+                    flash("⚠️ Audio file not found!", "error")
+                    return redirect(url_for("video_editor"))
+                audio_clip = AudioFileClip(audio_path)
+                result = clip.set_audio(audio_clip.set_duration(clip.duration)) # Ensure audio matches video length
+                output_filename = f"audio_{video_name}"
+            else:
+                flash("⚠️ Unknown action.", "error")
+                return redirect(url_for("video_editor"))
+            
+            output_path = os.path.join(app.config["UPLOAD_FOLDER"], output_filename)
+            result.write_videofile(output_path, codec="libx24", audio_codec="aac")
+            return send_file(output_path, as_attachment=True)
+
+    except Exception as e:
+        flash(f"⚠️ An error occurred: {e}", "error")
+        return redirect(url_for("video_editor"))
+    # Merge is a special case with multiple files
+    if action == "merge":
+        # ... logic for merge ...
+        pass
+
     return redirect(url_for("video_editor"))
 
 
-# ------------------ TRIM ------------------
-@app.route("/trim", methods=["POST"])
-def trim_video():
-    video_name = request.form.get("video")
-    start = request.form.get("start")
-    end = request.form.get("end")
-
-    try:
-        start = float(start)
-        end = float(end)
-    except:
-        flash("⚠️ Invalid start or end time!", "error")
-        return redirect(url_for("video_editor"))
-
-    video_path = os.path.join(app.config["UPLOAD_FOLDER"], video_name)
-    if not os.path.exists(video_path):
-        flash("⚠️ Video not found!", "error")
-        return redirect(url_for("video_editor"))
-
-    output_path = os.path.join(app.config["UPLOAD_FOLDER"], f"trimmed_{video_name}")
-    with VideoFileClip(video_path) as clip:
-        new_clip = clip.subclip(start, end)
-        new_clip.write_videofile(output_path, codec="libx264", audio_codec="aac")
-
-    flash(f"🎬 Trimmed video saved as trimmed_{video_name}", "success")
-    return send_file(output_path, as_attachment=True)
-
-
-# ------------------ MERGE ------------------
-@app.route("/merge", methods=["POST"])
-def merge_videos():
-    video_files = request.form.get("videos")
-    if not video_files:
-        flash("⚠️ Enter video filenames separated by commas.", "error")
-        return redirect(url_for("video_editor"))
-
-    paths = [os.path.join(app.config["UPLOAD_FOLDER"], v.strip()) for v in video_files.split(",")]
-    clips = [VideoFileClip(p) for p in paths if os.path.exists(p)]
-
-    if not clips:
-        flash("⚠️ No valid videos found!", "error")
-        return redirect(url_for("video_editor"))
-
-    output_path = os.path.join(app.config["UPLOAD_FOLDER"], "merged_video.mp4")
-    final = concatenate_videoclips(clips)
-    final.write_videofile(output_path, codec="libx264", audio_codec="aac")
-
-    flash("✅ Videos merged successfully!", "success")
-    return send_file(output_path, as_attachment=True)
-
-
-# ------------------ ADD TEXT ------------------
-@app.route("/add_text", methods=["POST"])
-def add_text():
-    video_name = request.form.get("video")
-    text = request.form.get("text")
-
-    video_path = os.path.join(app.config["UPLOAD_FOLDER"], video_name)
-    if not os.path.exists(video_path):
-        flash("⚠️ Video not found!", "error")
-        return redirect(url_for("video_editor"))
-
-    output_path = os.path.join(app.config["UPLOAD_FOLDER"], f"text_{video_name}")
-    with VideoFileClip(video_path) as clip:
-        txt_clip = TextClip(text, fontsize=50, color='white', font='Arial-Bold')
-        txt_clip = txt_clip.set_position('center').set_duration(clip.duration)
-        final = CompositeVideoClip([clip, txt_clip])
-        final.write_videofile(output_path, codec="libx264", audio_codec="aac")
-
-    flash(f"✅ Text added successfully to {video_name}", "success")
-    return send_file(output_path, as_attachment=True)
-
-
-# ------------------ ADD AUDIO ------------------
-@app.route("/add_audio", methods=["POST"])
-def add_audio():
-    video_name = request.form.get("video")
-    audio_name = request.form.get("audio")
-
-    video_path = os.path.join(app.config["UPLOAD_FOLDER"], video_name)
-    audio_path = os.path.join(app.config["UPLOAD_FOLDER"], audio_name)
-    if not os.path.exists(video_path) or not os.path.exists(audio_path):
-        flash("⚠️ Video or audio file not found!", "error")
-        return redirect(url_for("video_editor"))
-
-    output_path = os.path.join(app.config["UPLOAD_FOLDER"], f"mixed_{video_name}")
-    with VideoFileClip(video_path) as clip:
-        audio_clip = AudioFileClip(audio_path)
-        final = clip.set_audio(audio_clip)
-        final.write_videofile(output_path, codec="libx264", audio_codec="aac")
-
-    flash("🎧 Audio added successfully!", "success")
-    return send_file(output_path, as_attachment=True)
-
-
+# 7. MAIN EXECUTION BLOCK
 
 
 if __name__ == "__main__":
-    if not os.path.exists(DATABASE_FILE):
-        init_db()
-    print(f"📂 Database ready at: {os.path.abspath(DATABASE_FILE)}")
-    app.run(debug=True)
+    create_user_table()
+    init_db()
+    print(f"📂 Databases ready at: {os.path.abspath(DATABASE_FILE)}")
+    app.run(debug=True, port=5000)

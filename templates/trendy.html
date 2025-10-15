@@ -1,70 +1,66 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>🔥 What's Trending?</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-  <style>
-    body { font-family: 'Inter', sans-serif; }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔥 What's Trending?</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style> body { font-family: 'Inter', sans-serif; } </style>
 </head>
 
 <body class="bg-gray-900 text-white min-h-screen flex flex-col items-center justify-center px-4 py-10">
 
-  <h1 class="text-4xl font-bold text-yellow-400 mb-8 flex items-center gap-2">
-    🔥 What's Trending?
-  </h1>
+    <h1 class="text-4xl font-bold text-yellow-400 mb-8 flex items-center gap-2">
+        🔥 What's Trending?
+    </h1>
 
-  <!-- Country & State Selection -->
-  <form action="{{ url_for('trendy') }}" method="GET" class="flex flex-wrap items-center justify-center gap-4 mb-8">
-    <select name="country" class="px-4 py-2 bg-gray-800 text-white rounded-lg focus:ring-2 focus:ring-yellow-400">
-      <option value="India" {% if country == "India" %}selected{% endif %}>India</option>
-      <option value="USA" {% if country == "USA" %}selected{% endif %}>USA</option>
-      <option value="UK" {% if country == "UK" %}selected{% endif %}>UK</option>
-      <option value="Australia" {% if country == "Australia" %}selected{% endif %}>Australia</option>
-    </select>
+    <form action="{{ url_for('trendy') }}" method="GET" class="flex flex-wrap items-center justify-center gap-4 mb-8">
+        <select name="country" class="px-4 py-2 bg-gray-800 text-white rounded-lg focus:ring-2 focus:ring-yellow-400">
+            <option value="India" {% if country == "India" %}selected{% endif %}>India</option>
+            <option value="USA" {% if country == "USA" %}selected{% endif %}>USA</option>
+            <option value="UK" {% if country == "UK" %}selected{% endif %}>UK</option>
+            <option value="Australia" {% if country == "Australia" %}selected{% endif %}>Australia</option>
+        </select>
 
-    <select name="state" class="px-4 py-2 bg-gray-800 text-white rounded-lg focus:ring-2 focus:ring-yellow-400">
-      <option value="">-- Select Indian State --</option>
-      <option value="Delhi" {% if state == "Delhi" %}selected{% endif %}>Delhi</option>
-      <option value="Maharashtra" {% if state == "Maharashtra" %}selected{% endif %}>Maharashtra</option>
-      <option value="West Bengal" {% if state == "West Bengal" %}selected{% endif %}>West Bengal</option>
-      <option value="Karnataka" {% if state == "Karnataka" %}selected{% endif %}>Karnataka</option>
-      <option value="Tamil Nadu" {% if state == "Tamil Nadu" %}selected{% endif %}>Tamil Nadu</option>
-    </select>
+        <select name="state" class="px-4 py-2 bg-gray-800 text-white rounded-lg focus:ring-2 focus:ring-yellow-400">
+            <option value="">-- Select Indian State --</option>
+            <option value="Delhi" {% if state == "Delhi" %}selected{% endif %}>Delhi</option>
+            <option value="Maharashtra" {% if state == "Maharashtra" %}selected{% endif %}>Maharashtra</option>
+            <option value="West Bengal" {% if state == "West Bengal" %}selected{% endif %}>West Bengal</option>
+            <option value="Karnataka" {% if state == "Karnataka" %}selected{% endif %}>Karnataka</option>
+            <option value="Tamil Nadu" {% if state == "Tamil Nadu" %}selected{% endif %}>Tamil Nadu</option>
+        </select>
 
-    <button type="submit" class="bg-yellow-400 text-black font-semibold px-5 py-2 rounded-lg hover:bg-yellow-300 transition">
-      Show Trends
-    </button>
-  </form>
+        <button type="submit" class="bg-yellow-400 text-black font-semibold px-5 py-2 rounded-lg hover:bg-yellow-300 transition">
+            Show Trends
+        </button>
+    </form>
 
-  <!-- Trends Section -->
-  <div class="bg-gray-800 p-8 rounded-2xl shadow-xl w-full max-w-2xl text-center mb-10">
-    <h2 class="text-3xl font-bold text-yellow-400 mb-6">
-      🔥 Top Trends in {{ state or country }}
-    </h2>
+    <div class="bg-gray-800 p-8 rounded-2xl shadow-xl w-full max-w-2xl text-center mb-10">
+        <h2 class="text-3xl font-bold text-yellow-400 mb-6">
+            Top Trends in {{ state or country }}
+        </h2>
 
-    <ul class="space-y-3 text-lg text-gray-200">
-      {% for t in trends %}
-      <li>{{ t }}</li>
-      {% endfor %}
-    </ul>
-  </div>
+        <ul class="space-y-3 text-lg text-gray-200">
+            {% for t in trends %}
+                <li>{{ t }}</li>
+            {% else %}
+                <li>No trends found. Click "Show Trends" to begin.</li>
+            {% endfor %}
+        </ul>
+    </div>
 
-  <!-- Tip Section -->
-  <div class="bg-yellow-400 text-black rounded-xl shadow-lg p-6 w-full max-w-lg text-center font-semibold">
-    🤖 AI Viral Strategy:
-    <p class="mt-2 font-normal text-gray-800">{{ ai_tip }}</p>
-  </div>
+    <div class="bg-yellow-400 text-black rounded-xl shadow-lg p-6 w-full max-w-lg text-center font-semibold">
+        🤖 AI Viral Strategy:
+        <p class="mt-2 font-normal text-gray-800">{{ ai_tip }}</p>
+    </div>
 
-  <!-- Back -->
-  <div class="text-center mt-10">
-    <a href="{{ url_for('dashboard') }}" class="text-yellow-400 hover:underline text-lg">
-      ← Back to Dashboard
-    </a>
-  </div>
+    <div class="text-center mt-10">
+        <a href="{{ url_for('dashboard') }}" class="text-yellow-400 hover:underline text-lg">
+            ← Back to Dashboard
+        </a>
+    </div>
 
 </body>
 </html>

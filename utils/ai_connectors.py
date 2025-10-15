@@ -48,26 +48,44 @@ def _call_openrouter(prompt, api_key):
 
 
 # 🔹 Main generator function
-def generate_text(prompt, context="default"):
+import os, requests
+
+def generate_text(prompt, api_key=None):
+    key = api_key or os.getenv("OPENROUTER_API_KEY")
+    headers = {
+        "Authorization": f"Bearer {key}",
+        "Content-Type": "application/json",
+    }
+
+    payload = {
+        "model": "deepseek/deepseek-r1:free",
+        "messages": [{"role": "user", "content": prompt}],
+        "max_tokens": 300,
+        "temperature": 0.7,
+    }
+
     try:
-        headers = {
-            "Authorization": f"Bearer {os.getenv('OPENROUTER_API_KEY')}",
-            "Content-Type": "application/json",
-        }
-        data = {
-            "model": "deepseek/deepseek-r1:free",
-            "messages": [
-                {"role": "system", "content": "You are an expert marketing assistant specializing in trend prediction and viral strategy."},
-                {"role": "user", "content": prompt}
-            ]
-        }
+        response = requests.post(
+            "https://openrouter.ai/api/v1/chat/completions",
+            headers=headers,
+            json=payload,
+            timeout=60,
+        )
+        data = response.json()
 
-        response = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=data, timeout=60)
-        response.raise_for_status()
-        return response.json()["choices"][0]["message"]["content"].strip()
+        # ✅ check before accessing
+        if "choices" in data and len(data["choices"]) > 0:
+            return data["choices"][0]["message"]["content"].strip()
+        elif "error" in data:
+            return f"⚠️ OpenRouter error: {data['error'].get('message', 'Unknown error')}"
+        else:
+            return "⚠️ Unexpected API response. Please try again later."
 
+    except requests.exceptions.RequestException as e:
+        return f"⚠️ Request failed: {e}"
     except Exception as e:
-        return f"⚠️ OpenRouter error: {e}"
+        return f"⚠️ Error generating content: {e}"
+
 
 # 🔹 SERPAPI: Fetch trending topics (Trends + fallback to News)
 def fetch_trending_keywords(region="India"):
