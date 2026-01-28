@@ -3,96 +3,1339 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Advanced Video Editor</title>
+    <title>HypeItUp Studio - Pro Video Editor</title>
+    
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <style> body { font-family: "Inter", sans-serif; } </style>
+    <link href="https://vjs.zencdn.net/8.3.0/video-js.css" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/noUiSlider/15.7.0/nouislider.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Archivo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --bg-void: #000000;
+            --bg-main: #0a0a0a;
+            --bg-panel: #141414;
+            --bg-hover: #1f1f1f;
+            --bg-elevated: #1a1a1a;
+            --border-primary: #2a2a2a;
+            --border-highlight: #3a3a3a;
+            --accent-gold: #FFD700;
+            --accent-blue: #3b82f6;
+            --accent-cyan: #06b6d4;
+            --accent-green: #10b981;
+            --accent-red: #ef4444;
+            --accent-purple: #a855f7;
+            --text-primary: #ededed;
+            --text-secondary: #a1a1a1;
+            --text-muted: #6b6b6b;
+        }
+        
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body { 
+            background-color: var(--bg-void); 
+            color: var(--text-primary); 
+            font-family: 'Archivo', -apple-system, sans-serif;
+            overflow: hidden; 
+            height: 100vh; 
+            display: flex; 
+            flex-direction: column;
+        }
+        
+        .font-mono { font-family: 'JetBrains Mono', monospace; }
+        
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: var(--bg-main); }
+        ::-webkit-scrollbar-thumb { 
+            background: #333; 
+            border-radius: 3px;
+            transition: background 0.2s;
+        }
+        ::-webkit-scrollbar-thumb:hover { background: #444; }
+
+        /* Video Player */
+        .video-js { width: 100%; max-width: 100%; height: 100%; }
+        .vjs-big-play-button {
+            background-color: rgba(59, 130, 246, 0.85) !important;
+            border: none !important;
+            width: 80px !important; 
+            height: 80px !important;
+            line-height: 80px !important; 
+            border-radius: 50% !important;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        }
+        .vjs-big-play-button:hover {
+            background-color: rgba(59, 130, 246, 1) !important;
+            transform: scale(1.05);
+        }
+        .video-js .vjs-control-bar { 
+            background: linear-gradient(to top, rgba(0,0,0,0.9), rgba(0,0,0,0.7)) !important;
+            backdrop-filter: blur(10px);
+        }
+
+        /* TIMELINE - Complete Redesign */
+        .timeline-container {
+            position: relative;
+            background: linear-gradient(to bottom, #0d0d0d, #050505);
+            border: 1px solid var(--border-primary);
+            border-radius: 6px;
+            overflow: visible;
+            padding: 8px;
+        }
+
+        .timeline-tracks {
+            position: relative;
+            min-height: 80px;
+        }
+
+        .timeline-track {
+            position: relative;
+            height: 60px;
+            background: #1a1a1a;
+            border: 1px solid var(--border-primary);
+            border-radius: 4px;
+            margin-bottom: 8px;
+            overflow: hidden;
+        }
+
+        .timeline-clip {
+            position: absolute;
+            top: 4px;
+            height: 52px;
+            background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
+            border: 2px solid var(--accent-blue);
+            border-radius: 4px;
+            cursor: move;
+            display: flex;
+            align-items: center;
+            padding: 0 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+            transition: all 0.2s;
+        }
+
+        .timeline-clip:hover {
+            border-color: var(--accent-cyan);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+        }
+
+        .timeline-clip.selected {
+            border-color: var(--accent-gold);
+            box-shadow: 0 0 0 2px rgba(255, 215, 0, 0.3), 0 4px 12px rgba(255, 215, 0, 0.4);
+        }
+
+        .clip-name {
+            font-size: 11px;
+            font-weight: 600;
+            color: white;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            flex: 1;
+        }
+
+        .clip-duration {
+            font-size: 9px;
+            font-family: 'JetBrains Mono', monospace;
+            color: rgba(255,255,255,0.6);
+            margin-left: 8px;
+        }
+
+        /* Trim Handles */
+        .trim-handle {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 8px;
+            background: var(--accent-gold);
+            cursor: ew-resize;
+            z-index: 10;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .timeline-clip:hover .trim-handle,
+        .timeline-clip.selected .trim-handle {
+            opacity: 1;
+        }
+
+        .trim-handle.left {
+            left: 0;
+            border-radius: 4px 0 0 4px;
+        }
+
+        .trim-handle.right {
+            right: 0;
+            border-radius: 0 4px 4px 0;
+        }
+
+        .trim-handle::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 2px;
+            height: 60%;
+            background: rgba(0,0,0,0.4);
+        }
+
+        /* Playhead */
+        .playhead {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: var(--accent-cyan);
+            pointer-events: none;
+            z-index: 100;
+            box-shadow: 0 0 8px rgba(6, 182, 212, 0.8);
+        }
+
+        .playhead::before {
+            content: '';
+            position: absolute;
+            top: -8px;
+            left: -5px;
+            width: 12px;
+            height: 12px;
+            background: var(--accent-cyan);
+            border-radius: 50%;
+            box-shadow: 0 0 12px rgba(6, 182, 212, 1);
+        }
+
+        /* Timeline Ruler */
+        .timeline-ruler {
+            height: 24px;
+            border-bottom: 1px solid var(--border-primary);
+            position: relative;
+            margin-bottom: 8px;
+            background: var(--bg-elevated);
+        }
+
+        .ruler-tick {
+            position: absolute;
+            bottom: 0;
+            font-size: 9px;
+            color: var(--text-muted);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .ruler-tick::before {
+            content: '';
+            position: absolute;
+            bottom: -4px;
+            left: 0;
+            width: 1px;
+            height: 6px;
+            background: var(--border-highlight);
+        }
+
+        .ruler-tick.major::before {
+            height: 10px;
+            background: var(--text-muted);
+        }
+
+        /* Asset Item */
+        .asset-item {
+            position: relative;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            user-select: none;
+        }
+
+        .asset-item:hover {
+            transform: translateX(2px);
+        }
+
+        .asset-item.active {
+            background: var(--bg-hover);
+            border-color: var(--accent-blue) !important;
+        }
+
+        .asset-item.active::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 3px;
+            background: var(--accent-blue);
+            border-radius: 0 2px 2px 0;
+        }
+
+        /* Draggable */
+        .dragging {
+            opacity: 0.5;
+            cursor: grabbing !important;
+        }
+
+        /* Loading Overlay */
+        .loading-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.95);
+            backdrop-filter: blur(10px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .loading-overlay.active {
+            display: flex;
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 3px solid var(--border-primary);
+            border-top-color: var(--accent-blue);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .progress-bar {
+            width: 300px;
+            height: 4px;
+            background: var(--bg-panel);
+            border-radius: 2px;
+            overflow: hidden;
+            margin-top: 20px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent-blue), var(--accent-cyan));
+            width: 0%;
+            transition: width 0.3s;
+            border-radius: 2px;
+        }
+
+        /* Toast Notification */
+        .toast {
+            position: fixed;
+            top: 80px;
+            right: 20px;
+            background: var(--bg-panel);
+            border: 1px solid var(--border-highlight);
+            border-radius: 8px;
+            padding: 16px 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+            z-index: 10000;
+            transform: translateX(400px);
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            max-width: 400px;
+        }
+
+        .toast.show {
+            transform: translateX(0);
+        }
+
+        .toast.success { border-left: 4px solid var(--accent-green); }
+        .toast.error { border-left: 4px solid var(--accent-red); }
+        .toast.info { border-left: 4px solid var(--accent-blue); }
+
+        /* Button States */
+        .btn-primary {
+            background: var(--accent-blue);
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            background: #2563eb;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+        }
+
+        .btn-primary:active:not(:disabled) {
+            transform: translateY(0);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-secondary {
+            background: var(--bg-hover);
+            border: 1px solid var(--border-primary);
+            transition: all 0.2s;
+        }
+
+        .btn-secondary:hover:not(:disabled) {
+            background: var(--bg-elevated);
+            border-color: var(--border-highlight);
+        }
+
+        /* Modal */
+        .modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.9);
+            backdrop-filter: blur(5px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 9998;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: var(--bg-panel);
+            border: 1px solid var(--border-primary);
+            border-radius: 12px;
+            padding: 24px;
+            max-width: 500px;
+            width: 90%;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.7);
+        }
+
+        /* Checkbox */
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .checkbox-item:hover {
+            background: var(--bg-hover);
+        }
+
+        .checkbox-item input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+        }
+    </style>
 </head>
+<body>
 
-<body class="bg-gray-900 text-white p-8">
-    <h1 class="text-3xl font-bold text-yellow-400 mb-6 flex items-center">
-        🎬 Advanced Video Editor
-    </h1>
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loading-overlay">
+        <div class="spinner"></div>
+        <div class="text-center">
+            <p class="text-lg font-semibold text-white mb-2" id="loading-text">Processing Video...</p>
+            <p class="text-sm text-text-secondary">This may take a moment</p>
+        </div>
+        <div class="progress-bar">
+            <div class="progress-fill" id="progress-fill"></div>
+        </div>
+    </div>
 
-    {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-            <div class="w-full max-w-4xl mb-6">
-                {% for category, message in messages %}
-                    <div class="p-3 rounded-lg text-sm mb-2 {% if category == 'error' %}bg-red-500/20 text-red-300{% else %}bg-green-500/20 text-green-300{% endif %}">
-                        {{ message }}
+    <!-- Merge Videos Modal -->
+    <div class="modal" id="merge-modal">
+        <div class="modal-content">
+            <h3 class="text-lg font-bold text-white mb-4">Merge Videos</h3>
+            <p class="text-sm text-text-secondary mb-4">Select videos to merge in order:</p>
+            <div id="merge-video-list" class="space-y-2 max-h-64 overflow-y-auto mb-6">
+                <!-- Videos will be populated here -->
+            </div>
+            <div class="flex gap-3 justify-end">
+                <button onclick="closeMergeModal()" class="btn-secondary px-4 py-2 rounded-lg text-sm font-medium text-white">
+                    Cancel
+                </button>
+                <button onclick="executeMerge()" class="btn-primary px-4 py-2 rounded-lg text-sm font-bold text-white">
+                    Merge Selected
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Export Modal -->
+    <div class="modal" id="export-modal">
+        <div class="modal-content">
+            <h3 class="text-lg font-bold text-white mb-4">Export Video</h3>
+            
+            <div class="space-y-4 mb-6">
+                <div>
+                    <label class="text-xs font-bold text-text-secondary uppercase tracking-wide block mb-2">Quality</label>
+                    <select id="export-quality" class="w-full bg-bg-void border border-border-primary rounded-lg px-3 py-2 text-sm text-white focus:border-accent-blue focus:outline-none">
+                        <option value="high">High (1080p)</option>
+                        <option value="medium" selected>Medium (720p)</option>
+                        <option value="low">Low (480p)</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <label class="text-xs font-bold text-text-secondary uppercase tracking-wide block mb-2">Format</label>
+                    <select id="export-format" class="w-full bg-bg-void border border-border-primary rounded-lg px-3 py-2 text-sm text-white focus:border-accent-blue focus:outline-none">
+                        <option value="mp4" selected>MP4 (H.264)</option>
+                        <option value="webm">WebM</option>
+                        <option value="avi">AVI</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="text-xs font-bold text-text-secondary uppercase tracking-wide block mb-2">Filename</label>
+                    <input type="text" id="export-filename" placeholder="my_video" class="w-full bg-bg-void border border-border-primary rounded-lg px-3 py-2 text-sm text-white focus:border-accent-blue focus:outline-none">
+                </div>
+            </div>
+            
+            <div class="flex gap-3 justify-end">
+                <button onclick="closeExportModal()" class="btn-secondary px-4 py-2 rounded-lg text-sm font-medium text-white">
+                    Cancel
+                </button>
+                <button onclick="executeExport()" class="btn-primary px-4 py-2 rounded-lg text-sm font-bold text-white">
+                    Export Video
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Header -->
+    <header class="h-14 bg-bg-panel border-b border-border-primary flex items-center justify-between px-5 shrink-0" style="box-shadow: 0 2px 10px rgba(0,0,0,0.3);">
+        <div class="flex items-center gap-4">
+            <span class="text-base font-black text-accent-blue tracking-tight" style="letter-spacing: -0.5px;">HYPEITUP STUDIO</span>
+            <div class="h-4 w-px bg-border-primary"></div>
+            <span class="text-xs text-text-muted font-medium">Video Editor</span>
+        </div>
+        <div class="flex gap-2">
+            <button onclick="openMergeModal()" class="px-4 py-1.5 text-xs font-medium text-white bg-bg-hover border border-border-primary hover:border-accent-purple hover:text-accent-purple rounded transition">
+                <span class="mr-1">⚡</span> Merge Videos
+            </button>
+            <button onclick="openExportModal()" class="px-4 py-1.5 text-xs font-medium text-white bg-bg-hover border border-border-primary hover:border-accent-green hover:text-accent-green rounded transition">
+                <span class="mr-1">↓</span> Export
+            </button>
+            <a href="/dashboard" class="px-4 py-1.5 text-xs font-medium text-text-secondary hover:text-white border border-transparent hover:border-border-highlight rounded transition">Exit</a>
+            <button onclick="document.getElementById('file-upload').click()" class="px-4 py-1.5 text-xs font-bold bg-accent-blue hover:bg-blue-600 text-white rounded transition shadow-sm">
+                + Import Media
+            </button>
+            <form action="/upload_file" method="POST" enctype="multipart/form-data" class="hidden">
+                <input type="file" name="file" id="file-upload" accept="video/*,audio/*" onchange="this.form.submit()">
+            </form>
+        </div>
+    </header>
+
+    <div class="flex flex-1 overflow-hidden">
+        
+        <!-- Left Sidebar: Media Library -->
+        <aside class="w-64 bg-bg-panel border-r border-border-primary flex flex-col">
+            <div class="p-3 border-b border-border-primary bg-bg-elevated">
+                <h3 class="text-[10px] font-bold text-text-muted uppercase tracking-wide">Project Assets</h3>
+            </div>
+            
+            <div class="flex-1 overflow-y-auto p-3 space-y-2" id="media-library">
+                {% for video in videos %}
+                <div draggable="true" 
+                     ondragstart="handleDragStart(event, '{{ video }}')"
+                     onclick="selectAsset('{{ video }}')"
+                     class="asset-item group flex items-center gap-3 p-2 rounded-lg cursor-pointer border border-transparent hover:border-border-highlight"
+                     data-filename="{{ video }}"
+                     data-duration="0">
+                    <div class="w-8 h-8 bg-bg-main rounded flex items-center justify-center text-[10px] text-text-muted font-mono border border-border-primary shrink-0">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                        </svg>
                     </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-xs text-text-primary truncate group-hover:text-white font-medium">{{ video }}</p>
+                        <p class="text-[10px] text-text-muted">Video</p>
+                    </div>
+                </div>
+                {% else %}
+                <div class="text-center mt-12 space-y-2">
+                    <div class="text-4xl opacity-10">📁</div>
+                    <p class="text-[10px] text-text-muted uppercase tracking-wide">No Media Imported</p>
+                </div>
                 {% endfor %}
             </div>
+            
+            {% if audios %}
+            <div class="p-3 border-t border-border-primary max-h-32 overflow-y-auto bg-bg-elevated">
+                <h3 class="text-[10px] font-bold text-text-muted uppercase tracking-wide mb-2">Audio Files</h3>
+                {% for audio in audios %}
+                <div class="flex items-center gap-2 px-2 py-1.5 hover:bg-bg-hover rounded cursor-pointer mb-1">
+                    <span class="text-xs text-purple-400">♪</span>
+                    <span class="text-[11px] text-text-secondary truncate">{{ audio }}</span>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </aside>
+
+        <!-- Main: Video Preview -->
+        <main class="flex-1 bg-bg-void relative flex flex-col">
+            <div class="flex-1 p-6 flex items-center justify-center">
+                <video id="editor-player" class="video-js vjs-big-play-centered" controls preload="auto">
+                    <p class="vjs-no-js">Please enable JavaScript to use the video player.</p>
+                </video>
+            </div>
+        </main>
+
+        <!-- Right Sidebar: Inspector -->
+        <aside class="w-80 bg-bg-panel border-l border-border-primary flex flex-col overflow-y-auto">
+            <div class="p-3 border-b border-border-primary bg-bg-elevated sticky top-0 z-10">
+                <h3 class="text-[10px] font-bold text-text-muted uppercase tracking-wide">Clip Properties</h3>
+            </div>
+            
+            <div id="inspector-content" class="p-4 space-y-6">
+                
+                <!-- Trim Info -->
+                <div class="p-4 bg-bg-main rounded-lg border border-border-primary">
+                    <div class="flex justify-between items-center mb-3">
+                        <label class="text-xs font-bold text-accent-gold flex items-center gap-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.121 14.121L19 19m-7-7l7-7m-7 7l-2.879 2.879M12 12L9.121 9.121m0 5.758a3 3 0 10-4.243 4.243 3 3 0 004.243-4.243zm0-5.758a3 3 0 10-4.243-4.243 3 3 0 004.243 4.243z" />
+                            </svg>
+                            Trim Selection
+                        </label>
+                        <span id="trim-range-text" class="text-[10px] font-mono text-text-secondary bg-bg-void px-2 py-1 rounded">Not set</span>
+                    </div>
+                    
+                    <div class="text-[11px] text-text-muted leading-relaxed">
+                        <p class="mb-2">• Drag clip onto timeline</p>
+                        <p class="mb-2">• Click clip to select it</p>
+                        <p>• Drag golden handles to trim</p>
+                    </div>
+                </div>
+
+                <!-- Quick Actions -->
+                <div class="space-y-3">
+                    <label class="text-[11px] font-bold text-text-primary uppercase tracking-wide">Quick Actions</label>
+                    
+                    <button onclick="applyCurrentTrim()" class="w-full py-2 btn-primary text-xs font-bold text-white rounded-lg transition shadow-sm">
+                        Apply Trim
+                    </button>
+                    
+                    <button onclick="duplicateSelectedClip()" class="w-full py-2 btn-secondary text-xs font-medium text-white rounded-lg transition">
+                        Duplicate Clip
+                    </button>
+                    
+                    <button onclick="removeSelectedClip()" class="w-full py-2 bg-red-600 hover:bg-red-500 text-xs font-medium text-white rounded-lg transition">
+                        Remove from Timeline
+                    </button>
+                </div>
+
+                <!-- Text Overlay -->
+                <div class="space-y-3">
+                    <label class="text-[11px] font-bold text-text-primary uppercase tracking-wide flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
+                        </svg>
+                        Text Overlay
+                    </label>
+                    <form action="/process_video" method="POST" onsubmit="return handleFormSubmit(event, this)" class="flex gap-2">
+                        <input type="hidden" name="action" value="add_text">
+                        <input type="hidden" name="video" class="hidden-video-input">
+                        <input type="text" 
+                               name="text" 
+                               placeholder="Enter caption text..." 
+                               class="flex-1 bg-bg-void border border-border-primary rounded-lg px-3 py-2 text-xs text-white placeholder-text-muted focus:border-accent-blue focus:outline-none transition"
+                               required>
+                        <button type="submit" class="px-4 btn-secondary text-xs text-white rounded-lg font-medium transition">
+                            Add
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Audio Track -->
+                {% if audios %}
+                <div class="space-y-3">
+                    <label class="text-[11px] font-bold text-text-primary uppercase tracking-wide flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+                        </svg>
+                        Audio Track
+                    </label>
+                    <form action="/process_video" method="POST" onsubmit="return handleFormSubmit(event, this)" class="flex gap-2">
+                        <input type="hidden" name="action" value="add_audio">
+                        <input type="hidden" name="video" class="hidden-video-input">
+                        <select name="audio" 
+                                class="flex-1 bg-bg-void border border-border-primary rounded-lg px-3 py-2 text-xs text-white focus:border-accent-blue focus:outline-none transition"
+                                required>
+                            <option value="" disabled selected>Select audio...</option>
+                            {% for audio in audios %}
+                            <option value="{{ audio }}">{{ audio }}</option>
+                            {% endfor %}
+                        </select>
+                        <button type="submit" class="px-4 btn-secondary text-xs text-white rounded-lg font-medium transition">
+                            Merge
+                        </button>
+                    </form>
+                </div>
+                {% endif %}
+
+                <!-- Video Info -->
+                <div class="pt-6 border-t border-border-primary">
+                    <h4 class="text-[10px] font-bold text-text-muted uppercase tracking-wide mb-3">Timeline Info</h4>
+                    <div class="space-y-2 text-[11px]">
+                        <div class="flex justify-between">
+                            <span class="text-text-muted">Total Duration:</span>
+                            <span class="text-text-primary font-mono" id="timeline-duration">00:00.00</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-text-muted">Clips:</span>
+                            <span class="text-text-primary font-mono" id="clip-count">0</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-text-muted">Selected:</span>
+                            <span class="text-text-primary font-mono" id="selected-clip-name">None</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <!-- Footer: Timeline -->
+    <footer class="h-44 bg-bg-panel border-t border-border-primary flex flex-col shrink-0" style="box-shadow: 0 -2px 10px rgba(0,0,0,0.3);">
+        
+        <!-- Timeline Controls -->
+        <div class="h-10 border-b border-border-primary bg-bg-elevated flex items-center justify-between px-4">
+            <div class="flex items-center gap-4">
+                <button onclick="playPauseTimeline()" class="btn-secondary px-3 py-1 rounded text-xs font-medium text-white">
+                    <span id="play-pause-icon">▶</span> <span id="play-pause-text">Play</span>
+                </button>
+                <button onclick="stopTimeline()" class="btn-secondary px-3 py-1 rounded text-xs font-medium text-white">
+                    ⏹ Stop
+                </button>
+                <div class="h-4 w-px bg-border-primary"></div>
+                <span class="text-[11px] text-text-muted font-mono" id="timeline-current-time">00:00.00</span>
+                <span class="text-[10px] text-text-muted">/</span>
+                <span class="text-[11px] text-text-secondary font-mono" id="timeline-total-time">00:00.00</span>
+            </div>
+            
+            <div class="flex items-center gap-2">
+                <button onclick="zoomTimeline(-1)" class="btn-secondary px-2 py-1 rounded text-xs">-</button>
+                <span class="text-[10px] text-text-muted font-mono" id="zoom-level">100%</span>
+                <button onclick="zoomTimeline(1)" class="btn-secondary px-2 py-1 rounded text-xs">+</button>
+            </div>
+        </div>
+
+        <!-- Timeline Container -->
+        <div class="flex-1 p-4 overflow-x-auto overflow-y-hidden" id="timeline-scroll-container">
+            <div class="timeline-container" id="timeline-container" style="min-width: 1000px;">
+                <!-- Ruler -->
+                <div class="timeline-ruler" id="timeline-ruler"></div>
+                
+                <!-- Tracks -->
+                <div class="timeline-tracks" id="timeline-tracks"
+                     ondrop="handleDrop(event)" 
+                     ondragover="handleDragOver(event)">
+                    <div class="timeline-track" id="main-track">
+                        <!-- Clips will be added here -->
+                        <div class="playhead" id="timeline-playhead" style="left: 8px;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script src="https://vjs.zencdn.net/8.3.0/video.min.js"></script>
+    <script>
+        // ===== GLOBAL STATE =====
+        let player = null;
+        let timeline = {
+            clips: [],
+            selectedClip: null,
+            duration: 0,
+            currentTime: 0,
+            pixelsPerSecond: 100,
+            isPlaying: false,
+            playbackInterval: null
+        };
+
+        // ===== INITIALIZE =====
+        function initializeEditor() {
+            player = videojs('editor-player', {
+                controls: true,
+                fluid: true,
+                preload: 'auto',
+                controlBar: {
+                    pictureInPictureToggle: false,
+                    fullscreenToggle: true
+                }
+            });
+
+            player.on('timeupdate', syncPlayhead);
+            player.on('play', () => timeline.isPlaying = true);
+            player.on('pause', () => timeline.isPlaying = false);
+            player.on('ended', stopTimeline);
+
+            updateTimelineInfo();
+            loadVideoMetadata();
+        }
+
+        // ===== LOAD VIDEO METADATA =====
+        function loadVideoMetadata() {
+            const assets = document.querySelectorAll('.asset-item');
+            assets.forEach(asset => {
+                const filename = asset.dataset.filename;
+                const video = document.createElement('video');
+                video.preload = 'metadata';
+                
+                video.onloadedmetadata = function() {
+                    asset.dataset.duration = video.duration;
+                };
+                
+                video.src = `/uploads/${filename}`;
+            });
+        }
+
+        // ===== DRAG AND DROP =====
+        let draggedFilename = null;
+
+        function handleDragStart(event, filename) {
+            draggedFilename = filename;
+            event.target.classList.add('dragging');
+        }
+
+        function handleDragOver(event) {
+            event.preventDefault();
+            event.dataTransfer.dropEffect = 'copy';
+        }
+
+        function handleDrop(event) {
+            event.preventDefault();
+            document.querySelectorAll('.dragging').forEach(el => el.classList.remove('dragging'));
+            
+            if (!draggedFilename) return;
+
+            const asset = document.querySelector(`[data-filename="${draggedFilename}"]`);
+            const duration = parseFloat(asset.dataset.duration) || 10;
+
+            addClipToTimeline(draggedFilename, duration);
+            draggedFilename = null;
+        }
+
+        // ===== TIMELINE CLIP MANAGEMENT =====
+        function addClipToTimeline(filename, duration) {
+            const clip = {
+                id: Date.now(),
+                filename: filename,
+                duration: duration,
+                trimStart: 0,
+                trimEnd: duration,
+                position: timeline.duration
+            };
+
+            timeline.clips.push(clip);
+            timeline.duration += duration;
+            
+            renderTimeline();
+            updateTimelineInfo();
+            showToast(`Added ${filename} to timeline`, 'success');
+        }
+
+        function renderTimeline() {
+            const track = document.getElementById('main-track');
+            
+            // Clear existing clips (except playhead)
+            const existingClips = track.querySelectorAll('.timeline-clip');
+            existingClips.forEach(clip => clip.remove());
+
+            // Render each clip
+            let currentPosition = 0;
+            timeline.clips.forEach((clip, index) => {
+                const clipElement = createClipElement(clip, currentPosition, index);
+                track.appendChild(clipElement);
+                currentPosition += (clip.trimEnd - clip.trimStart);
+            });
+
+            // Update ruler
+            generateTimelineRuler();
+        }
+
+        function createClipElement(clip, position, index) {
+            const clipDuration = clip.trimEnd - clip.trimStart;
+            const clipWidth = clipDuration * timeline.pixelsPerSecond;
+            
+            const div = document.createElement('div');
+            div.className = 'timeline-clip';
+            div.dataset.clipId = clip.id;
+            div.dataset.index = index;
+            div.style.left = `${position * timeline.pixelsPerSecond + 8}px`;
+            div.style.width = `${clipWidth}px`;
+            
+            div.innerHTML = `
+                <div class="trim-handle left" onmousedown="startTrim(event, ${clip.id}, 'start')"></div>
+                <div class="clip-name">${clip.filename}</div>
+                <div class="clip-duration">${formatTime(clipDuration)}</div>
+                <div class="trim-handle right" onmousedown="startTrim(event, ${clip.id}, 'end')"></div>
+            `;
+            
+            div.onclick = (e) => {
+                if (!e.target.classList.contains('trim-handle')) {
+                    selectClip(clip.id);
+                }
+            };
+            
+            return div;
+        }
+
+        function selectClip(clipId) {
+            timeline.selectedClip = clipId;
+            
+            document.querySelectorAll('.timeline-clip').forEach(el => {
+                el.classList.toggle('selected', parseInt(el.dataset.clipId) === clipId);
+            });
+
+            const clip = timeline.clips.find(c => c.id === clipId);
+            if (clip) {
+                document.getElementById('selected-clip-name').innerText = clip.filename;
+                document.getElementById('trim-range-text').innerText = 
+                    `${formatTime(clip.trimStart)} - ${formatTime(clip.trimEnd)}`;
+                
+                // Load clip in player
+                player.src({ type: 'video/mp4', src: `/uploads/${clip.filename}` });
+                player.currentTime(clip.trimStart);
+            }
+        }
+
+        function selectAsset(filename) {
+            document.querySelectorAll('.asset-item').forEach(item => {
+                item.classList.toggle('active', item.dataset.filename === filename);
+            });
+        }
+
+        // ===== TRIM FUNCTIONALITY =====
+        let trimming = null;
+
+        function startTrim(event, clipId, side) {
+            event.stopPropagation();
+            
+            const clip = timeline.clips.find(c => c.id === clipId);
+            if (!clip) return;
+
+            trimming = {
+                clipId: clipId,
+                side: side,
+                startX: event.clientX,
+                originalTrimStart: clip.trimStart,
+                originalTrimEnd: clip.trimEnd
+            };
+
+            document.addEventListener('mousemove', handleTrim);
+            document.addEventListener('mouseup', endTrim);
+            
+            selectClip(clipId);
+        }
+
+        function handleTrim(event) {
+            if (!trimming) return;
+
+            const clip = timeline.clips.find(c => c.id === trimming.clipId);
+            if (!clip) return;
+
+            const deltaX = event.clientX - trimming.startX;
+            const deltaTime = deltaX / timeline.pixelsPerSecond;
+
+            if (trimming.side === 'start') {
+                const newTrimStart = Math.max(0, Math.min(
+                    trimming.originalTrimStart + deltaTime,
+                    clip.trimEnd - 0.5
+                ));
+                clip.trimStart = newTrimStart;
+            } else {
+                const newTrimEnd = Math.min(clip.duration, Math.max(
+                    trimming.originalTrimEnd + deltaTime,
+                    clip.trimStart + 0.5
+                ));
+                clip.trimEnd = newTrimEnd;
+            }
+
+            renderTimeline();
+            updateTimelineInfo();
+            
+            document.getElementById('trim-range-text').innerText = 
+                `${formatTime(clip.trimStart)} - ${formatTime(clip.trimEnd)}`;
+        }
+
+        function endTrim() {
+            if (trimming) {
+                const clip = timeline.clips.find(c => c.id === trimming.clipId);
+                if (clip) {
+                    showToast(`Trim updated: ${formatTime(clip.trimStart)} - ${formatTime(clip.trimEnd)}`, 'info');
+                }
+            }
+            trimming = null;
+            document.removeEventListener('mousemove', handleTrim);
+            document.removeEventListener('mouseup', endTrim);
+        }
+
+        function applyCurrentTrim() {
+            if (!timeline.selectedClip) {
+                showToast('Please select a clip first', 'error');
+                return;
+            }
+
+            const clip = timeline.clips.find(c => c.id === timeline.selectedClip);
+            if (!clip) return;
+
+            // Show loading
+            showLoading('Applying trim...');
+
+            // Submit to backend
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = '/process_video';
+            
+            const fields = {
+                action: 'trim',
+                video: clip.filename,
+                start: clip.trimStart.toFixed(2),
+                end: clip.trimEnd.toFixed(2)
+            };
+
+            for (const [key, value] of Object.entries(fields)) {
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = key;
+                input.value = value;
+                form.appendChild(input);
+            }
+
+            document.body.appendChild(form);
+            form.submit();
+        }
+
+        // ===== PLAYBACK CONTROLS =====
+        function playPauseTimeline() {
+            if (timeline.clips.length === 0) {
+                showToast('Add clips to timeline first', 'error');
+                return;
+            }
+
+            if (timeline.isPlaying) {
+                pauseTimeline();
+            } else {
+                playTimeline();
+            }
+        }
+
+        function playTimeline() {
+            timeline.isPlaying = true;
+            document.getElementById('play-pause-icon').innerText = '⏸';
+            document.getElementById('play-pause-text').innerText = 'Pause';
+            
+            // Play first clip
+            if (timeline.clips.length > 0) {
+                const firstClip = timeline.clips[0];
+                player.src({ type: 'video/mp4', src: `/uploads/${firstClip.filename}` });
+                player.currentTime(firstClip.trimStart);
+                player.play();
+            }
+
+            // Animate playhead
+            timeline.playbackInterval = setInterval(() => {
+                timeline.currentTime += 0.05;
+                updatePlayheadPosition();
+                updateTimeDisplay();
+            }, 50);
+        }
+
+        function pauseTimeline() {
+            timeline.isPlaying = false;
+            player.pause();
+            document.getElementById('play-pause-icon').innerText = '▶';
+            document.getElementById('play-pause-text').innerText = 'Play';
+            
+            if (timeline.playbackInterval) {
+                clearInterval(timeline.playbackInterval);
+                timeline.playbackInterval = null;
+            }
+        }
+
+        function stopTimeline() {
+            pauseTimeline();
+            timeline.currentTime = 0;
+            updatePlayheadPosition();
+            updateTimeDisplay();
+        }
+
+        function syncPlayhead() {
+            if (timeline.isPlaying && player) {
+                // Sync timeline time with player time
+                // (More complex logic needed for multi-clip playback)
+            }
+        }
+
+        function updatePlayheadPosition() {
+            const playhead = document.getElementById('timeline-playhead');
+            const position = timeline.currentTime * timeline.pixelsPerSecond + 8;
+            playhead.style.left = `${position}px`;
+        }
+
+        function updateTimeDisplay() {
+            document.getElementById('timeline-current-time').innerText = formatTime(timeline.currentTime);
+        }
+
+        // ===== ZOOM =====
+        function zoomTimeline(direction) {
+            const zoomLevels = [50, 75, 100, 150, 200, 300];
+            const currentIndex = zoomLevels.indexOf(timeline.pixelsPerSecond);
+            let newIndex = currentIndex + direction;
+            
+            newIndex = Math.max(0, Math.min(newIndex, zoomLevels.length - 1));
+            timeline.pixelsPerSecond = zoomLevels[newIndex];
+            
+            document.getElementById('zoom-level').innerText = `${timeline.pixelsPerSecond}%`;
+            renderTimeline();
+        }
+
+        // ===== CLIP OPERATIONS =====
+        function duplicateSelectedClip() {
+            if (!timeline.selectedClip) {
+                showToast('Please select a clip first', 'error');
+                return;
+            }
+
+            const clip = timeline.clips.find(c => c.id === timeline.selectedClip);
+            if (!clip) return;
+
+            addClipToTimeline(clip.filename, clip.duration);
+        }
+
+        function removeSelectedClip() {
+            if (!timeline.selectedClip) {
+                showToast('Please select a clip first', 'error');
+                return;
+            }
+
+            timeline.clips = timeline.clips.filter(c => c.id !== timeline.selectedClip);
+            timeline.selectedClip = null;
+            
+            // Recalculate positions
+            let pos = 0;
+            timeline.clips.forEach(clip => {
+                clip.position = pos;
+                pos += (clip.trimEnd - clip.trimStart);
+            });
+            
+            timeline.duration = pos;
+            
+            renderTimeline();
+            updateTimelineInfo();
+            showToast('Clip removed from timeline', 'info');
+        }
+
+        // ===== MERGE MODAL =====
+        function openMergeModal() {
+            const videoList = document.getElementById('merge-video-list');
+            videoList.innerHTML = '';
+
+            const videos = Array.from(document.querySelectorAll('.asset-item')).map(el => el.dataset.filename);
+            
+            if (videos.length < 2) {
+                showToast('Need at least 2 videos to merge', 'error');
+                return;
+            }
+
+            videos.forEach((video, index) => {
+                const div = document.createElement('div');
+                div.className = 'checkbox-item';
+                div.innerHTML = `
+                    <input type="checkbox" id="merge-${index}" value="${video}">
+                    <label for="merge-${index}" class="text-sm text-white cursor-pointer flex-1">${video}</label>
+                `;
+                videoList.appendChild(div);
+            });
+
+            document.getElementById('merge-modal').classList.add('active');
+        }
+
+        function closeMergeModal() {
+            document.getElementById('merge-modal').classList.remove('active');
+        }
+
+        function executeMerge() {
+            const checkboxes = document.querySelectorAll('#merge-video-list input[type="checkbox"]:checked');
+            
+            if (checkboxes.length < 2) {
+                showToast('Select at least 2 videos to merge', 'error');
+                return;
+            }
+
+            const videos = Array.from(checkboxes).map(cb => cb.value);
+            
+            showLoading('Merging videos...');
+            closeMergeModal();
+
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = '/process_video';
+            
+            const actionInput = document.createElement('input');
+            actionInput.type = 'hidden';
+            actionInput.name = 'action';
+            actionInput.value = 'merge';
+            form.appendChild(actionInput);
+
+            videos.forEach(video => {
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = 'videos';
+                input.value = video;
+                form.appendChild(input);
+            });
+
+            document.body.appendChild(form);
+            form.submit();
+        }
+
+        // ===== EXPORT MODAL =====
+        function openExportModal() {
+            if (timeline.clips.length === 0) {
+                showToast('Add clips to timeline before exporting', 'error');
+                return;
+            }
+
+            document.getElementById('export-filename').value = `project_${Date.now()}`;
+            document.getElementById('export-modal').classList.add('active');
+        }
+
+        function closeExportModal() {
+            document.getElementById('export-modal').classList.remove('active');
+        }
+
+        function executeExport() {
+            const quality = document.getElementById('export-quality').value;
+            const format = document.getElementById('export-format').value;
+            const filename = document.getElementById('export-filename').value.trim();
+
+            if (!filename) {
+                showToast('Please enter a filename', 'error');
+                return;
+            }
+
+            showLoading('Exporting video...');
+            closeExportModal();
+
+            // For now, if there's only one clip, export it
+            // Full implementation would stitch timeline clips together
+            if (timeline.clips.length === 1) {
+                const clip = timeline.clips[0];
+                
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = '/process_video';
+                
+                form.innerHTML = `
+                    <input type="hidden" name="action" value="export">
+                    <input type="hidden" name="video" value="${clip.filename}">
+                    <input type="hidden" name="start" value="${clip.trimStart}">
+                    <input type="hidden" name="end" value="${clip.trimEnd}">
+                    <input type="hidden" name="quality" value="${quality}">
+                    <input type="hidden" name="format" value="${format}">
+                    <input type="hidden" name="filename" value="${filename}">
+                `;
+                
+                document.body.appendChild(form);
+                form.submit();
+            } else {
+                // Multi-clip export would need backend stitching
+                showToast('Multi-clip export: Feature in development', 'info');
+                hideLoading();
+            }
+        }
+
+        // ===== TIMELINE INFO =====
+        function updateTimelineInfo() {
+            document.getElementById('timeline-duration').innerText = formatTime(timeline.duration);
+            document.getElementById('timeline-total-time').innerText = formatTime(timeline.duration);
+            document.getElementById('clip-count').innerText = timeline.clips.length;
+        }
+
+        function generateTimelineRuler() {
+            const ruler = document.getElementById('timeline-ruler');
+            ruler.innerHTML = '';
+
+            const duration = Math.max(timeline.duration, 10);
+            const tickInterval = duration > 60 ? 10 : duration > 30 ? 5 : 1;
+            
+            for (let i = 0; i <= duration; i += tickInterval) {
+                const tick = document.createElement('div');
+                tick.className = `ruler-tick ${i % (tickInterval * 5) === 0 ? 'major' : ''}`;
+                tick.style.left = `${i * timeline.pixelsPerSecond + 8}px`;
+                tick.innerText = formatTime(i);
+                ruler.appendChild(tick);
+            }
+        }
+
+        // ===== UTILITIES =====
+        function formatTime(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            const ms = Math.floor((seconds % 1) * 100);
+            
+            return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}.${ms.toString().padStart(2, '0')}`;
+        }
+
+        function showToast(message, type = 'info') {
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.innerHTML = `
+                <div class="flex items-start gap-3">
+                    <div class="shrink-0 text-lg">
+                        ${type === 'success' ? '✓' : type === 'error' ? '✕' : 'ℹ'}
+                    </div>
+                    <div>
+                        <p class="text-sm font-semibold text-white">${type.charAt(0).toUpperCase() + type.slice(1)}</p>
+                        <p class="text-xs text-text-secondary mt-1">${message}</p>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(toast);
+            
+            setTimeout(() => toast.classList.add('show'), 10);
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => toast.remove(), 300);
+            }, 4000);
+        }
+
+        function showLoading(text = 'Processing...') {
+            document.getElementById('loading-text').innerText = text;
+            document.getElementById('loading-overlay').classList.add('active');
+        }
+
+        function hideLoading() {
+            document.getElementById('loading-overlay').classList.remove('active');
+        }
+
+        function handleFormSubmit(event, form) {
+            event.preventDefault();
+            
+            // Validate
+            const videoInput = form.querySelector('.hidden-video-input');
+            if (videoInput && !videoInput.value) {
+                showToast('Please select a video first', 'error');
+                return false;
+            }
+
+            showLoading('Processing video...');
+            form.submit();
+            return false;
+        }
+
+        // ===== FLASH MESSAGES =====
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        window.addEventListener('DOMContentLoaded', function() {
+            {% for category, message in messages %}
+            showToast("{{ message }}", "{{ category }}");
+            {% endfor %}
+            hideLoading();
+        });
         {% endif %}
-    {% endwith %}
+        {% endwith %}
 
-    <form action="{{ url_for('upload_file') }}" method="POST" enctype="multipart/form-data" class="mb-8 w-full max-w-4xl">
-        <div class="flex items-center gap-3 bg-gray-800 p-4 rounded-xl">
-            <input type="file" name="file" accept="video/*,audio/*" class="w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-yellow-50 file:text-yellow-700 hover:file:bg-yellow-100">
-            <button type="submit" class="bg-yellow-400 text-black px-4 py-2 rounded-lg font-semibold hover:bg-yellow-300 transition whitespace-nowrap">Upload File</button>
-        </div>
-    </form>
-
-    <div class="grid md:grid-cols-2 gap-8 w-full max-w-4xl">
-
-        <div class="bg-gray-800 p-6 rounded-xl">
-            <h2 class="text-xl font-semibold mb-3 text-yellow-400">✂️ Trim Video</h2>
-            <form action="{{ url_for('process_video') }}" method="POST" class="space-y-3">
-                <input type="hidden" name="action" value="trim">
-                <select name="video" class="w-full px-3 py-2 rounded bg-gray-700 text-white" required>
-                    <option value="" disabled selected>Select a video to trim</option>
-                    {% for v in videos %}<option value="{{ v }}">{{ v }}</option>{% endfor %}
-                </select>
-                <input type="text" name="start" placeholder="Start time (in seconds)" class="w-full px-3 py-2 rounded bg-gray-700" required>
-                <input type="text" name="end" placeholder="End time (in seconds)" class="w-full px-3 py-2 rounded bg-gray-700" required>
-                <button type="submit" class="w-full bg-yellow-400 text-black font-bold py-2 rounded hover:bg-yellow-300">Trim</button>
-            </form>
-        </div>
-
-        <div class="bg-gray-800 p-6 rounded-xl">
-            <h2 class="text-xl font-semibold mb-3 text-green-400">🔗 Merge Videos</h2>
-            <form action="{{ url_for('process_video') }}" method="POST" class="space-y-3">
-                <input type="hidden" name="action" value="merge">
-                <select name="videos" multiple class="w-full px-3 py-2 rounded bg-gray-700 text-white h-32" required>
-                    {% for v in videos %}<option value="{{ v }}">{{ v }}</option>{% endfor %}
-                </select>
-                <button type="submit" class="w-full bg-green-500 text-white font-bold py-2 rounded hover:bg-green-400">Merge</button>
-            </form>
-            <p class="text-xs text-gray-400 mt-1">* Hold Ctrl (Cmd on Mac) to select multiple videos</p>
-        </div>
-
-        <div class="bg-gray-800 p-6 rounded-xl">
-            <h2 class="text-xl font-semibold mb-3 text-blue-400">📝 Add Text</h2>
-            <form action="{{ url_for('process_video') }}" method="POST" class="space-y-3">
-                <input type="hidden" name="action" value="add_text">
-                <select name="video" class="w-full px-3 py-2 rounded bg-gray-700 text-white" required>
-                    <option value="" disabled selected>Select a video</option>
-                    {% for v in videos %}<option value="{{ v }}">{{ v }}</option>{% endfor %}
-                </select>
-                <input type="text" name="text" placeholder="Enter text to add" class="w-full px-3 py-2 rounded bg-gray-700" required>
-                <button type="submit" class="w-full bg-blue-500 text-white font-bold py-2 rounded hover:bg-blue-400">Add Text</button>
-            </form>
-        </div>
-
-        <div class="bg-gray-800 p-6 rounded-xl">
-            <h2 class="text-xl font-semibold mb-3 text-purple-400">🎵 Add Audio</h2>
-            <form action="{{ url_for('process_video') }}" method="POST" class="space-y-3">
-                <input type="hidden" name="action" value="add_audio">
-                <select name="video" class="w-full px-3 py-2 rounded bg-gray-700 text-white" required>
-                    <option value="" disabled selected>Select a video</option>
-                    {% for v in videos %}<option value="{{ v }}">{{ v }}</option>{% endfor %}
-                </select>
-                <select name="audio" class="w-full px-3 py-2 rounded bg-gray-700 text-white" required>
-                    <option value="" disabled selected>Select an audio file</option>
-                    {% for a in audios %}<option value="{{ a }}">{{ a }}</option>{% endfor %}
-                </select>
-                <button type="submit" class="w-full bg-purple-500 text-white font-bold py-2 rounded hover:bg-purple-400">Add Audio</button>
-            </form>
-        </div>
-    </div>
-    
-    <div class="mt-12">
-        <a href="{{ url_for('dashboard') }}" class="text-yellow-400 hover:underline">← Back to Dashboard</a>
-    </div>
+        // ===== INITIALIZE ON LOAD =====
+        window.addEventListener('DOMContentLoaded', initializeEditor);
+    </script>
 </body>
 </html>

@@ -5,7 +5,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>HypeItUp Dashboard</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+   <!-- <script src="https://cdn.tailwindcss.com"></script> -->
+  <link href="https://unpkg.com/tailwindcss@^2/dist/tailwind.min.css" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <style>
     body {
@@ -67,7 +68,7 @@
 
     <!-- Feature Grid -->
     <main class="w-full max-w-4xl">
-      <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 md:gap-8 text-center">
+      <!-- <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 md:gap-8 text-center">
         <a href="{{ url_for('meme_templates') }}" class="dashboard-card" style="background-color: #feda6a">
           <span class="font-semibold text-gray-800">Meme Template</span>
         </a>
@@ -92,6 +93,33 @@
         <a href="{{ url_for('create_post') }}" class="dashboard-card bg-[#FEDA6A] font-semibold text-gray-800">
           Post on X/Reddit
         </a>
+      </div> -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 md:gap-8 text-center">
+        
+        <a href="{{ url_for('meme_templates') }}" class="dashboard-card" style="background-color: #feda6a">
+          <span class="font-semibold text-gray-800">Meme Template</span>
+        </a>
+
+        <a href="{{ url_for('trendy') }}" class="dashboard-card" style="background-color: #feda6a">
+          <span class="font-semibold text-gray-800">Trendy</span>
+        </a>
+
+        <a href="{{ url_for('recommendations') }}" class="dashboard-card" style="background-color: #feda6a">
+          <span class="font-semibold text-gray-800">Meme/Reel Recommendation</span>
+        </a>
+
+        <a href="{{ url_for('video_editor') }}" class="dashboard-card" style="background-color: #feda6a">
+          <span class="font-semibold text-gray-800">Editor</span>
+        </a>
+
+        <a href="{{ url_for('goals') }}" class="dashboard-card" style="background-color: #feda6a">
+          <span class="font-semibold text-gray-800">Set Goal</span>
+        </a>
+
+        <a href="{{ url_for('create_post') }}" class="dashboard-card" style="background-color: #feda6a">
+          <span class="font-semibold text-gray-800">Post on X/Reddit</span>
+        </a>
+
       </div>
     </main>
 
