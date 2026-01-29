@@ -1,0 +1,291 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - HypeItUp Studio{% endblock %}
+
+{% block extra_css %}
+<style>
+    .dashboard-header {
+        margin-bottom: 3rem;
+        text-align: center;
+    }
+    
+    .welcome-title {
+        font-size: 3rem;
+        font-weight: 800;
+        background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        margin-bottom: 0.5rem;
+        animation: fadeInUp 0.6s ease;
+    }
+    
+    .welcome-subtitle {
+        font-size: 1.1rem;
+        color: var(--text-secondary);
+        animation: fadeInUp 0.6s 0.2s ease both;
+    }
+    
+    @keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    
+    .features-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 1.5rem;
+        margin-bottom: 3rem;
+    }
+    
+    .feature-card {
+        background: var(--bg-card);
+        border: 1px solid var(--border-subtle);
+        border-radius: 20px;
+        padding: 2rem;
+        transition: all var(--transition-smooth);
+        cursor: pointer;
+        text-decoration: none;
+        display: flex;
+        flex-direction: column;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .feature-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 4px;
+        background: linear-gradient(90deg, var(--primary), var(--accent));
+        transform: scaleX(0);
+        transition: transform var(--transition-smooth);
+    }
+    
+    .feature-card:hover {
+        transform: translateY(-8px);
+        border-color: var(--primary);
+        box-shadow: var(--shadow-lg), var(--shadow-glow);
+    }
+    
+    .feature-card:hover::before {
+        transform: scaleX(1);
+    }
+    
+    .feature-icon {
+        font-size: 3rem;
+        margin-bottom: 1rem;
+        display: inline-block;
+    }
+    
+    .feature-title {
+        font-size: 1.4rem;
+        font-weight: 700;
+        color: var(--text-primary);
+        margin-bottom: 0.5rem;
+    }
+    
+    .feature-description {
+        color: var(--text-secondary);
+        font-size: 0.95rem;
+        line-height: 1.6;
+        flex: 1;
+    }
+    
+    .feature-cta {
+        margin-top: 1rem;
+        color: var(--primary);
+        font-weight: 600;
+        font-size: 0.9rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    
+    .feature-card:hover .feature-cta {
+        gap: 0.75rem;
+    }
+    
+    .goals-section {
+        background: var(--bg-card);
+        border: 1px solid var(--border-subtle);
+        border-radius: 20px;
+        padding: 2rem;
+        margin-bottom: 2rem;
+    }
+    
+    .goals-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1.5rem;
+    }
+    
+    .goals-title {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--text-primary);
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    
+    .goal-item {
+        background: var(--bg-input);
+        border: 1px solid var(--border-subtle);
+        border-radius: 12px;
+        padding: 1rem 1.25rem;
+        margin-bottom: 0.75rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        transition: all var(--transition-smooth);
+    }
+    
+    .goal-item:hover {
+        background: var(--bg-card-hover);
+        border-color: var(--border-bright);
+    }
+    
+    .goal-info {
+        flex: 1;
+    }
+    
+    .goal-task {
+        color: var(--text-primary);
+        font-weight: 600;
+        margin-bottom: 0.25rem;
+    }
+    
+    .goal-duration {
+        color: var(--text-muted);
+        font-size: 0.85rem;
+    }
+    
+    .empty-state {
+        text-align: center;
+        padding: 3rem 2rem;
+        color: var(--text-muted);
+    }
+    
+    .empty-state-icon {
+        font-size: 4rem;
+        opacity: 0.3;
+        margin-bottom: 1rem;
+    }
+    
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+    }
+    
+    .stat-card {
+        background: var(--bg-card);
+        border: 1px solid var(--border-subtle);
+        border-radius: 16px;
+        padding: 1.5rem;
+        text-align: center;
+    }
+    
+    .stat-value {
+        font-size: 2.5rem;
+        font-weight: 800;
+        color: var(--primary);
+        margin-bottom: 0.5rem;
+    }
+    
+    .stat-label {
+        color: var(--text-secondary);
+        font-size: 0.9rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="dashboard-header">
+    <h1 class="welcome-title">Welcome Back, {{ username }}!</h1>
+    <p class="welcome-subtitle">Your creative marketing toolkit awaits</p>
+</div>
+
+<!-- Recent Goals -->
+{% if goals %}
+<div class="goals-section">
+    <div class="goals-header">
+        <h2 class="goals-title">
+            <span>🎯</span>
+            Your Current Goals
+        </h2>
+        <a href="{{ url_for('goals') }}" class="btn btn-secondary">View All</a>
+    </div>
+    
+    {% for goal in goals %}
+    <div class="goal-item">
+        <div class="goal-info">
+            <div class="goal-task">{{ goal.task }}</div>
+            <div class="goal-duration">⏱ {{ goal.duration }}</div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<!-- Features Grid -->
+<div class="features-grid">
+    <a href="{{ url_for('goals') }}" class="feature-card">
+        <span class="feature-icon">🎯</span>
+        <h3 class="feature-title">Set Goals</h3>
+        <p class="feature-description">
+            Track your marketing campaigns and content creation milestones with smart goal management.
+        </p>
+        <span class="feature-cta">Manage goals →</span>
+    </a>
+    
+    <a href="{{ url_for('create_post') }}" class="feature-card">
+        <span class="feature-icon">✨</span>
+        <h3 class="feature-title">AI Post Generator</h3>
+        <p class="feature-description">
+            Create viral social media posts instantly with AI-powered content generation for any platform.
+        </p>
+        <span class="feature-cta">Generate post →</span>
+    </a>
+    
+    <a href="{{ url_for('meme_templates') }}" class="feature-card">
+        <span class="feature-icon">😂</span>
+        <h3 class="feature-title">Meme Creator</h3>
+        <p class="feature-description">
+            Choose from trending meme templates and create engaging content that resonates with your audience.
+        </p>
+        <span class="feature-cta">Create meme →</span>
+    </a>
+    
+    <a href="{{ url_for('video_editor') }}" class="feature-card">
+        <span class="feature-icon">🎬</span>
+        <h3 class="feature-title">Video Editor</h3>
+        <p class="feature-description">
+            Professional video editing with trim, merge, text overlay, and audio replacement features.
+        </p>
+        <span class="feature-cta">Edit videos →</span>
+    </a>
+</div>
+
+{% if not goals %}
+<div class="empty-state">
+    <div class="empty-state-icon">🚀</div>
+    <h3 style="color: var(--text-primary); margin-bottom: 0.5rem;">Ready to Start?</h3>
+    <p style="margin-bottom: 1.5rem;">Set your first marketing goal or create content with our AI tools</p>
+    <a href="{{ url_for('goals') }}" class="btn btn-primary">Add Your First Goal</a>
+</div>
+{% endif %}
+{% endblock %}

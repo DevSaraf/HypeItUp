@@ -1,0 +1,830 @@
+{% extends "base.html" %}
+
+{% block title %}Settings - HypeItUp Studio{% endblock %}
+
+{% block extra_css %}
+<style>
+    .settings-container {
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+    
+    .settings-layout {
+        display: grid;
+        grid-template-columns: 280px 1fr;
+        gap: 2rem;
+        align-items: start;
+    }
+
+    @media (max-width: 968px) {
+        .settings-layout { 
+            grid-template-columns: 1fr; 
+        }
+        .settings-sidebar {
+            position: static !important;
+        }
+    }
+
+    /* Page Header */
+    .page-header {
+        margin-bottom: 3rem;
+    }
+    
+    .page-title {
+        font-size: 2.5rem;
+        font-weight: 800;
+        background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        margin-bottom: 0.5rem;
+    }
+    
+    .page-subtitle {
+        color: var(--text-secondary);
+        font-size: 1.1rem;
+    }
+
+    /* Sidebar Navigation */
+    .settings-sidebar {
+        background: var(--bg-card);
+        border: 1px solid var(--border-subtle);
+        border-radius: 16px;
+        padding: 1.5rem;
+        position: sticky;
+        top: 100px;
+    }
+
+    .sidebar-section {
+        margin-bottom: 2rem;
+    }
+
+    .sidebar-section:last-child {
+        margin-bottom: 0;
+    }
+
+    .sidebar-title {
+        font-size: 0.75rem;
+        font-weight: 700;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        margin-bottom: 0.75rem;
+        padding: 0 0.5rem;
+    }
+
+    .settings-nav-link {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.75rem 1rem;
+        color: var(--text-secondary);
+        text-decoration: none;
+        border-radius: 8px;
+        transition: all var(--transition-smooth);
+        margin-bottom: 0.25rem;
+        font-size: 0.95rem;
+        font-weight: 500;
+    }
+
+    .settings-nav-link:hover {
+        background: var(--bg-hover);
+        color: var(--text-primary);
+    }
+
+    .settings-nav-link.active {
+        background: var(--bg-input);
+        color: var(--text-primary);
+        border-left: 3px solid var(--primary);
+    }
+
+    .nav-icon {
+        font-size: 1.2rem;
+        width: 24px;
+        text-align: center;
+    }
+
+    /* Content Sections */
+    .settings-content {
+        display: flex;
+        flex-direction: column;
+        gap: 2rem;
+    }
+
+    .settings-section {
+        background: var(--bg-card);
+        border: 1px solid var(--border-subtle);
+        border-radius: 20px;
+        padding: 2rem;
+        animation: fadeIn 0.5s ease;
+    }
+
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    .section-header {
+        border-bottom: 1px solid var(--border-subtle);
+        padding-bottom: 1.5rem;
+        margin-bottom: 2rem;
+    }
+
+    .section-title {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--text-primary);
+        margin-bottom: 0.5rem;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .section-description {
+        color: var(--text-muted);
+        font-size: 0.95rem;
+        line-height: 1.6;
+    }
+
+    /* Profile Avatar */
+    .profile-avatar-section {
+        display: flex;
+        align-items: center;
+        gap: 2rem;
+        margin-bottom: 2rem;
+        padding-bottom: 2rem;
+        border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .avatar-circle {
+        width: 100px;
+        height: 100px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--primary), var(--secondary));
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 2.5rem;
+        font-weight: 800;
+        color: white;
+        box-shadow: var(--shadow-glow);
+        position: relative;
+    }
+
+    .avatar-badge {
+        position: absolute;
+        bottom: 0;
+        right: 0;
+        background: var(--accent);
+        color: var(--bg-dark);
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1rem;
+        border: 3px solid var(--bg-card);
+        cursor: pointer;
+    }
+
+    .avatar-info h3 {
+        font-size: 1.25rem;
+        margin-bottom: 0.25rem;
+    }
+
+    .avatar-info p {
+        color: var(--text-muted);
+        font-size: 0.9rem;
+    }
+
+    /* Setting Item */
+    .setting-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 1.25rem;
+        background: var(--bg-input);
+        border: 1px solid var(--border-subtle);
+        border-radius: 12px;
+        margin-bottom: 1rem;
+        transition: all var(--transition-smooth);
+    }
+
+    .setting-item:hover {
+        border-color: var(--border-bright);
+        background: var(--bg-hover);
+    }
+
+    .setting-info {
+        flex: 1;
+    }
+
+    .setting-title {
+        font-weight: 600;
+        color: var(--text-primary);
+        margin-bottom: 0.25rem;
+        font-size: 1rem;
+    }
+
+    .setting-desc {
+        color: var(--text-muted);
+        font-size: 0.85rem;
+        line-height: 1.5;
+    }
+
+    .setting-action {
+        margin-left: 1rem;
+    }
+
+    /* Toggle Switch */
+    .toggle-switch {
+        position: relative;
+        width: 48px;
+        height: 28px;
+        background: var(--border-subtle);
+        border-radius: 14px;
+        cursor: pointer;
+        transition: background var(--transition-smooth);
+    }
+
+    .toggle-switch.active {
+        background: var(--primary);
+    }
+
+    .toggle-switch::after {
+        content: '';
+        position: absolute;
+        top: 3px;
+        left: 3px;
+        width: 22px;
+        height: 22px;
+        background: white;
+        border-radius: 50%;
+        transition: transform var(--transition-smooth);
+    }
+
+    .toggle-switch.active::after {
+        transform: translateX(20px);
+    }
+
+    /* Stat Grid */
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 1rem;
+        margin-bottom: 2rem;
+    }
+
+    .stat-box {
+        background: var(--bg-input);
+        border: 1px solid var(--border-subtle);
+        border-radius: 12px;
+        padding: 1.25rem;
+        text-align: center;
+    }
+
+    .stat-value {
+        font-size: 2rem;
+        font-weight: 800;
+        color: var(--primary);
+        margin-bottom: 0.25rem;
+    }
+
+    .stat-label {
+        color: var(--text-muted);
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    /* Danger Zone */
+    .danger-zone {
+        border-color: rgba(239, 68, 68, 0.3) !important;
+    }
+
+    .danger-zone .section-title {
+        color: #ef4444;
+    }
+
+    .danger-action {
+        background: rgba(239, 68, 68, 0.1) !important;
+        border: 1px solid #ef4444 !important;
+        color: #ef4444 !important;
+    }
+
+    .danger-action:hover {
+        background: #ef4444 !important;
+        color: white !important;
+    }
+
+    /* Form Row */
+    .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem;
+    }
+
+    @media (max-width: 768px) {
+        .form-row {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    /* Badge */
+    .badge {
+        display: inline-block;
+        padding: 0.25rem 0.75rem;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    .badge-success {
+        background: rgba(16, 185, 129, 0.1);
+        color: #10B981;
+    }
+
+    .badge-warning {
+        background: rgba(245, 158, 11, 0.1);
+        color: #F59E0B;
+    }
+
+    .badge-info {
+        background: rgba(59, 130, 246, 0.1);
+        color: #3B82F6;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="settings-container">
+    <div class="page-header">
+        <h1 class="page-title">⚙️ Settings</h1>
+        <p class="page-subtitle">Manage your account, preferences, and privacy</p>
+    </div>
+
+    <div class="settings-layout">
+        <!-- Sidebar Navigation -->
+        <aside class="settings-sidebar">
+            <div class="sidebar-section">
+                <div class="sidebar-title">Account</div>
+                <a href="#profile" class="settings-nav-link active">
+                    <span class="nav-icon">👤</span>
+                    Profile
+                </a>
+                <a href="#security" class="settings-nav-link">
+                    <span class="nav-icon">🔒</span>
+                    Security
+                </a>
+                <a href="#notifications" class="settings-nav-link">
+                    <span class="nav-icon">🔔</span>
+                    Notifications
+                </a>
+            </div>
+
+            <div class="sidebar-section">
+                <div class="sidebar-title">Preferences</div>
+                <a href="#appearance" class="settings-nav-link">
+                    <span class="nav-icon">🎨</span>
+                    Appearance
+                </a>
+                <a href="#accessibility" class="settings-nav-link">
+                    <span class="nav-icon">♿</span>
+                    Accessibility
+                </a>
+            </div>
+
+            <div class="sidebar-section">
+                <div class="sidebar-title">Data</div>
+                <a href="#privacy" class="settings-nav-link">
+                    <span class="nav-icon">🛡️</span>
+                    Privacy
+                </a>
+                <a href="#data-export" class="settings-nav-link">
+                    <span class="nav-icon">📦</span>
+                    Data & Storage
+                </a>
+            </div>
+
+            <div class="sidebar-section">
+                <div class="sidebar-title">Advanced</div>
+                <a href="#danger-zone" class="settings-nav-link" style="color: #ef4444;">
+                    <span class="nav-icon">⚠️</span>
+                    Danger Zone
+                </a>
+            </div>
+        </aside>
+
+        <!-- Settings Content -->
+        <div class="settings-content">
+            
+            <!-- Profile Section -->
+            <section id="profile" class="settings-section">
+                <div class="section-header">
+                    <h2 class="section-title">
+                        <span>👤</span>
+                        Profile Information
+                    </h2>
+                    <p class="section-description">
+                        Update your personal information and how you appear across HypeItUp Studio
+                    </p>
+                </div>
+
+                <div class="profile-avatar-section">
+                    <div class="avatar-circle">
+                        {{ user['username'][0] | upper }}
+                        <div class="avatar-badge" title="Change avatar">📷</div>
+                    </div>
+                    <div class="avatar-info">
+                        <h3>{{ user['username'] }}</h3>
+                        <p>{{ user['email'] }}</p>
+                        <div style="margin-top: 0.5rem;">
+                            <span class="badge badge-success">Verified</span>
+                        </div>
+                    </div>
+                </div>
+
+                <form method="POST" action="{{ url_for('profile') }}">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Username</label>
+                            <input type="text" name="username" class="form-input" value="{{ user['username'] }}" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Email Address</label>
+                            <input type="email" name="email" class="form-input" value="{{ user['email'] }}" required>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">
+                        <span>💾</span> Save Changes
+                    </button>
+                </form>
+            </section>
+
+            <!-- Security Section -->
+            <section id="security" class="settings-section">
+                <div class="section-header">
+                    <h2 class="section-title">
+                        <span>🔒</span>
+                        Security
+                    </h2>
+                    <p class="section-description">
+                        Keep your account secure with a strong password and additional security measures
+                    </p>
+                </div>
+
+                <form action="{{ url_for('change_password') }}" method="POST">
+                    <div class="form-group">
+                        <label class="form-label">Current Password</label>
+                        <input type="password" name="current_password" class="form-input" placeholder="Enter current password" required>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">New Password</label>
+                            <input type="password" name="new_password" class="form-input" placeholder="Enter new password" required minlength="8">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Confirm New Password</label>
+                            <input type="password" name="confirm_password" class="form-input" placeholder="Confirm new password" required>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-secondary">
+                        <span>🔐</span> Update Password
+                    </button>
+                </form>
+
+                <div style="margin-top: 2rem; padding-top: 2rem; border-top: 1px solid var(--border-subtle);">
+                    <h3 style="font-size: 1.1rem; margin-bottom: 1rem; color: var(--text-primary);">Active Sessions</h3>
+                    
+                    <div class="setting-item">
+                        <div class="setting-info">
+                            <div class="setting-title">🖥️ Current Session</div>
+                            <div class="setting-desc">Your active session on this device</div>
+                        </div>
+                        <div class="setting-action">
+                            <span class="badge badge-success">Active</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Notifications Section -->
+            <section id="notifications" class="settings-section">
+                <div class="section-header">
+                    <h2 class="section-title">
+                        <span>🔔</span>
+                        Notification Preferences
+                    </h2>
+                    <p class="section-description">
+                        Choose how and when you want to be notified about activity
+                    </p>
+                </div>
+
+                <div class="setting-item">
+                    <div class="setting-info">
+                        <div class="setting-title">Email Notifications</div>
+                        <div class="setting-desc">Receive email updates about your account activity and goals</div>
+                    </div>
+                    <div class="setting-action">
+                        <div class="toggle-switch active" onclick="this.classList.toggle('active')"></div>
+                    </div>
+                </div>
+
+                <div class="setting-item">
+                    <div class="setting-info">
+                        <div class="setting-title">Goal Reminders</div>
+                        <div class="setting-desc">Get notified when goals are approaching their deadline</div>
+                    </div>
+                    <div class="setting-action">
+                        <div class="toggle-switch active" onclick="this.classList.toggle('active')"></div>
+                    </div>
+                </div>
+
+                <div class="setting-item">
+                    <div class="setting-info">
+                        <div class="setting-title">Marketing Updates</div>
+                        <div class="setting-desc">Receive tips, feature updates, and marketing inspiration</div>
+                    </div>
+                    <div class="setting-action">
+                        <div class="toggle-switch" onclick="this.classList.toggle('active')"></div>
+                    </div>
+                </div>
+
+                <div class="setting-item">
+                    <div class="setting-info">
+                        <div class="setting-title">Processing Alerts</div>
+                        <div class="setting-desc">Get notified when video processing is complete</div>
+                    </div>
+                    <div class="setting-action">
+                        <div class="toggle-switch active" onclick="this.classList.toggle('active')"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Appearance Section -->
+            <section id="appearance" class="settings-section">
+                <div class="section-header">
+                    <h2 class="section-title">
+                        <span>🎨</span>
+                        Appearance
+                    </h2>
+                    <p class="section-description">
+                        Customize how HypeItUp Studio looks and feels
+                    </p>
+                </div>
+
+                <div class="setting-item">
+                    <div class="setting-info">
+                        <div class="setting-title">Dark Mode</div>
+                        <div class="setting-desc">Currently enabled (Default theme)</div>
+                    </div>
+                    <div class="setting-action">
+                        <div class="toggle-switch active" onclick="alert('Theme switching coming soon!')"></div>
+                    </div>
+                </div>
+
+                <div class="setting-item">
+                    <div class="setting-info">
+                        <div class="setting-title">Compact Mode</div>
+                        <div class="setting-desc">Reduce spacing and show more content on screen</div>
+                    </div>
+                    <div class="setting-action">
+                        <div class="toggle-switch" onclick="this.classList.toggle('active')"></div>
+                    </div>
+                </div>
+
+                <div class="setting-item">
+                    <div class="setting-info">
+                        <div class="setting-title">Animation Effects</div>
+                        <div class="setting-desc">Enable smooth transitions and animations</div>
+                    </div>
+                    <div class="setting-action">
+                        <div class="toggle-switch active" onclick="this.classList.toggle('active')"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Accessibility Section -->
+            <section id="accessibility" class="settings-section">
+                <div class="section-header">
+                    <h2 class="section-title">
+                        <span>♿</span>
+                        Accessibility
+                    </h2>
+                    <p class="section-description">
+                        Make HypeItUp Studio more accessible and comfortable to use
+                    </p>
+                </div>
+
+                <div class="setting-item">
+                    <div class="setting-info">
+                        <div class="setting-title">Large Text</div>
+                        <div class="setting-desc">Increase font size across the application</div>
+                    </div>
+                    <div class="setting-action">
+                        <div class="toggle-switch" onclick="this.classList.toggle('active')"></div>
+                    </div>
+                </div>
+
+                <div class="setting-item">
+                    <div class="setting-info">
+                        <div class="setting-title">High Contrast</div>
+                        <div class="setting-desc">Enhance color contrast for better visibility</div>
+                    </div>
+                    <div class="setting-action">
+                        <div class="toggle-switch" onclick="this.classList.toggle('active')"></div>
+                    </div>
+                </div>
+
+                <div class="setting-item">
+                    <div class="setting-info">
+                        <div class="setting-title">Reduce Motion</div>
+                        <div class="setting-desc">Minimize animations and transitions</div>
+                    </div>
+                    <div class="setting-action">
+                        <div class="toggle-switch" onclick="this.classList.toggle('active')"></div>
+                    </div>
+                </div>
+
+                <div class="setting-item">
+                    <div class="setting-info">
+                        <div class="setting-title">Screen Reader Mode</div>
+                        <div class="setting-desc">Optimize for screen reader accessibility</div>
+                    </div>
+                    <div class="setting-action">
+                        <div class="toggle-switch" onclick="this.classList.toggle('active')"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Privacy Section -->
+            <section id="privacy" class="settings-section">
+                <div class="section-header">
+                    <h2 class="section-title">
+                        <span>🛡️</span>
+                        Privacy & Data
+                    </h2>
+                    <p class="section-description">
+                        Control your data and privacy settings
+                    </p>
+                </div>
+
+                <div class="setting-item">
+                    <div class="setting-info">
+                        <div class="setting-title">Activity Tracking</div>
+                        <div class="setting-desc">Help us improve by sharing anonymous usage data</div>
+                    </div>
+                    <div class="setting-action">
+                        <div class="toggle-switch active" onclick="this.classList.toggle('active')"></div>
+                    </div>
+                </div>
+
+                <div class="setting-item">
+                    <div class="setting-info">
+                        <div class="setting-title">AI Training</div>
+                        <div class="setting-desc">Allow your content to help improve AI models (anonymized)</div>
+                    </div>
+                    <div class="setting-action">
+                        <div class="toggle-switch" onclick="this.classList.toggle('active')"></div>
+                    </div>
+                </div>
+
+                <div class="setting-item">
+                    <div class="setting-info">
+                        <div class="setting-title">Search History</div>
+                        <div class="setting-desc">Save your searches for quick access</div>
+                    </div>
+                    <div class="setting-action">
+                        <div class="toggle-switch active" onclick="this.classList.toggle('active')"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Data & Storage Section -->
+            <section id="data-export" class="settings-section">
+                <div class="section-header">
+                    <h2 class="section-title">
+                        <span>📦</span>
+                        Data & Storage
+                    </h2>
+                    <p class="section-description">
+                        Manage your account data and storage usage
+                    </p>
+                </div>
+
+                <div class="stats-grid">
+                    <div class="stat-box">
+                        <div class="stat-value">{{ goals|length }}</div>
+                        <div class="stat-label">Goals Created</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-value">0</div>
+                        <div class="stat-label">Videos Edited</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-value">0 MB</div>
+                        <div class="stat-label">Storage Used</div>
+                    </div>
+                </div>
+
+                <div class="setting-item">
+                    <div class="setting-info">
+                        <div class="setting-title">Export Account Data</div>
+                        <div class="setting-desc">Download all your goals, settings, and activity as JSON</div>
+                    </div>
+                    <div class="setting-action">
+                        <a href="{{ url_for('export_data') }}" class="btn btn-secondary" style="font-size: 0.9rem;">
+                            <span>📥</span> Download
+                        </a>
+                    </div>
+                </div>
+
+                <div class="setting-item">
+                    <div class="setting-info">
+                        <div class="setting-title">Clear Cache</div>
+                        <div class="setting-desc">Remove temporary files and free up space</div>
+                    </div>
+                    <div class="setting-action">
+                        <button class="btn btn-secondary" style="font-size: 0.9rem;" onclick="alert('Cache cleared!')">
+                            <span>🗑️</span> Clear
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Danger Zone -->
+            <section id="danger-zone" class="settings-section danger-zone">
+                <div class="section-header">
+                    <h2 class="section-title">
+                        <span>⚠️</span>
+                        Danger Zone
+                    </h2>
+                    <p class="section-description">
+                        Irreversible actions that permanently affect your account
+                    </p>
+                </div>
+
+                <div class="setting-item" style="border-color: rgba(239, 68, 68, 0.2);">
+                    <div class="setting-info">
+                        <div class="setting-title" style="color: #ef4444;">Delete Account</div>
+                        <div class="setting-desc">Permanently remove your account and all associated data. This action cannot be undone.</div>
+                    </div>
+                    <div class="setting-action">
+                        <form action="{{ url_for('delete_account') }}" method="POST" 
+                              onsubmit="return confirm('⚠️ Are you absolutely sure? This will:\n\n✓ Delete all your goals\n✓ Remove all uploaded media\n✓ Permanently close your account\n\nThis action CANNOT be undone!');">
+                            <button type="submit" class="btn danger-action">
+                                <span>🗑️</span> Delete Account
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </section>
+
+        </div>
+    </div>
+
+    <!-- Back to Dashboard -->
+    <div style="text-align: center; margin-top: 3rem;">
+        <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">
+            ← Back to Dashboard
+        </a>
+    </div>
+</div>
+
+<script>
+    // Smooth scroll to sections
+    document.querySelectorAll('.settings-nav-link').forEach(link => {
+        link.addEventListener('click', (e) => {
+            e.preventDefault();
+            
+            // Update active state
+            document.querySelectorAll('.settings-nav-link').forEach(l => l.classList.remove('active'));
+            link.classList.add('active');
+            
+            // Scroll to section
+            const targetId = link.getAttribute('href');
+            const target = document.querySelector(targetId);
+            if (target) {
+                target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        });
+    });
+
+    // Form validation
+    const passwordForm = document.querySelector('form[action*="change_password"]');
+    if (passwordForm) {
+        passwordForm.addEventListener('submit', (e) => {
+            const newPassword = passwordForm.querySelector('[name="new_password"]').value;
+            const confirmPassword = passwordForm.querySelector('[name="confirm_password"]').value;
+            
+            if (newPassword !== confirmPassword) {
+                e.preventDefault();
+                alert('New passwords do not match!');
+            }
+        });
+    }
+</script>
+{% endblock %}
