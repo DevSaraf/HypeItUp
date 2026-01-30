@@ -173,21 +173,31 @@ def logout():
 @app.route("/dashboard")
 @login_required
 def dashboard():
+    user_email = session.get("user")
+
     with sqlite3.connect(DATABASE_FILE) as conn:
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
-        
+
         # Fetch goals
         cursor.execute("SELECT * FROM goals ORDER BY id DESC")
         goals = cursor.fetchall()
-        
-        # Fetch user info (assuming you want to show their name)
-        # We use a safe default "Creator" if session user is missing
-        username = session.get("user", "Creator").split('@')[0] 
 
-    # 1. Point to the NEW file (dashboard.html)
-    # 2. Pass 'goals' (matches your template) instead of 'reminders'
-    return render_template("dashboard.html", goals=goals, username=username)
+        # Fetch username using email
+        cursor.execute(
+            "SELECT username FROM users WHERE email = ?",
+            (user_email,)
+        )
+        user = cursor.fetchone()
+
+        username = user["username"] if user else "Creator"
+
+    return render_template(
+        "dashboard.html",
+        goals=goals,
+        username=username
+    )
+
 
     
 
